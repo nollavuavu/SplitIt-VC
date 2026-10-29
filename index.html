@@ -1,0 +1,2273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>SplitIt</title>
+<style>
+/*
+  SplitIt styles (Agent 3). Mobile-first, plain CSS, no frameworks.
+
+  SHARED CSS CLASSES (anyone may use these; only Agent 2 adds more, prefixed ".in-")
+    .screen      Wrapper for one whole screen: centred column with page padding.
+    .title       Screen heading (big, bold text).
+    .stack       Vertical list of children with even gaps between them.
+    .row         Horizontal line of children with gaps; wraps on small screens.
+    .card        Boxed panel (border, rounded corners, padding) for one thing: an item, a person.
+    .btn         Base button: at least 44px tall, rounded, readable label.
+    .btn-primary Main action button (filled accent colour). Use together with .btn.
+    .btn-ghost   Secondary action button (transparent, outlined). Use together with .btn.
+    .chip        Small pill-shaped toggle button (a person, a tip %). At least 44px tall.
+    .chip.on     A chip that is currently selected (filled accent colour).
+    .input       Text/number input: full width, 16px font (stops iOS zoom), 44px tall.
+    .sticky-bar  Bar stuck to the bottom of the viewport holding Back/Next buttons.
+    .warn        Warning look: warning-coloured border/background. Works on cards and text.
+    .muted       Quieter, secondary text (smaller, grey).
+
+  Also styled here: #app > header (the shell's top bar with app name and step dots).
+  Extra classes used only inside ui.js (assign/results screens) start with ".ui-".
+*/
+
+/* ---------- Design tokens ---------- */
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --text: #1b1c1f;
+  --text-muted: #6b6f76;
+  --border: #dcdde1;
+  --accent: #2f6fde;
+  --accent-text: #ffffff;
+  --warn-bg: #fff4e0;
+  --warn-border: #e09b20;
+  --warn-text: #8a5300;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --radius: 12px;
+  --radius-pill: 999px;
+  --tap: 44px;            /* minimum tap target size */
+  /* Room kept free under each screen so the fixed bottom bar never hides
+     content. Big enough for the tallest bar we have (two stacked buttons on
+     upload, about 121px) plus slack; the phone's safe area is added on top. */
+  --bar-space: 160px;
+}
+
+/* Dark mode: same tokens, darker values */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121316;
+    --surface: #1c1d21;
+    --text: #ececef;
+    --text-muted: #9a9ea6;
+    --border: #33353b;
+    --accent: #5b8ff0;
+    --accent-text: #0d0e10;
+    --warn-bg: #3a2a0f;
+    --warn-border: #d4962b;
+    --warn-text: #f3c77a;
+  }
+}
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The hidden attribute must always win, even over display:flex classes. */
+[hidden] { display: none !important; }
+
+/* ---------- App header (drawn by shell.js as <header class="row">) ---------- */
+#app > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Shared classes ---------- */
+.screen {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--bar-space) + env(safe-area-inset-bottom, 0px)); /* don't hide content under the sticky bar */
+}
+
+.title {
+  margin: 0 0 var(--space-4);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.btn {
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+}
+
+.chip {
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.input {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;   /* 16px or more stops iOS from zooming in */
+}
+
+.sticky-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.sticky-bar .btn { flex: 1; }
+
+.warn {
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+  color: var(--warn-text);
+}
+.card.warn { border-width: 2px; }
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Agent 3 private helpers (assign/results only) ---------- */
+.ui-spread {             /* name on the left, amount on the right */
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.ui-item-name { font-weight: 600; overflow-wrap: anywhere; }
+.ui-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui-big { font-size: 1.6rem; font-weight: 700; }
+
+.ui-person-head {        /* whole top of a person card is one big tap target */
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ui-breakdown {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.ui-warning { padding: var(--space-3); border: 1px solid var(--warn-border); border-radius: var(--radius); }
+.ui-label { font-weight: 600; }
+
+/* input.css (Agent 2): styles for the upload, items and people screens.
+   Only ".in-" classes live here; shared look comes from styles.css. */
+
+/* ---------- upload ---------- */
+.in-pick {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+/* The real file input is invisible but still clickable through the label. */
+.in-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.in-preview { padding: 8px; text-align: center; }
+.in-preview[hidden] { display: none; }
+.in-preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: 45vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.in-error[hidden],
+.in-row-msg[hidden],
+.in-problems[hidden] { display: none; }
+.in-link {
+  background: none;
+  border: none;
+  text-decoration: underline;
+}
+.in-loading { opacity: 0.7; cursor: progress; }
+.in-loading::after {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.5em;
+  vertical-align: -0.1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: in-spin 0.8s linear infinite;
+}
+@keyframes in-spin { to { transform: rotate(360deg); } }
+
+/* ---------- items ---------- */
+.in-item { padding: 10px; }
+.in-item-fields {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.in-name  { flex: 1 1 auto; min-width: 0; }
+.in-qty   { flex: 0 0 3.5em; width: 3.5em; text-align: center; }
+.in-price { flex: 0 0 5.5em; width: 5.5em; text-align: right; }
+.in-del   { flex: 0 0 auto; min-width: 2.5em; font-size: 1.2em; line-height: 1; }
+.in-invalid { outline: 2px solid var(--warn-text, #d9534f); outline-offset: -2px; }
+.in-invalid-input { border-color: var(--warn-text, #d9534f); }
+.in-row-msg { margin: 4px 0 0; font-size: 0.85em; }
+.in-label { display: flex; flex-direction: column; gap: 4px; }
+.in-small { font-size: 0.85em; margin: 0; }
+.in-subtotal { font-weight: 600; font-size: 1.1em; text-align: right; }
+
+/* ---------- people ---------- */
+.in-add-person { display: flex; gap: 6px; }
+.in-person-input { flex: 1 1 auto; min-width: 0; }
+.in-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.in-chip { display: inline-flex; align-items: center; gap: 4px; }
+.in-chip-x {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.1em;
+  line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.in-hint { font-size: 0.9em; }
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/*
+ * engine.js - SplitIt engine (Agent 1)
+ *
+ * Pure logic only: no DOM, no fetch, no timers.
+ * Everything lives on globalThis.SplitIt.engine, so this file also runs in Node:
+ *   node -e "require('./engine.js'); SplitIt.engine.selfTest()"
+ *
+ * Money rule: every amount is an INTEGER number of cents. We only turn cents
+ * into text in formatMoney / formatPlainAmount, and text into cents in
+ * parseMoneyInput.
+ *
+ * State rule: we never change a state object. Every helper builds and
+ * returns a new one.
+ */
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "splitit.v1";
+  var STEPS = ["upload", "items", "people", "assign", "results"];
+  var uidCounter = 0;
+
+  /* ---------- Small helpers ---------- */
+
+  // Returns true if value is a whole number that is 0 or more.
+  function isNonNegativeInt(value) {
+    return Number.isInteger(value) && value >= 0;
+  }
+
+  // Makes a shallow copy of an item, including a copy of its assignedTo list.
+  function copyItem(item) {
+    return {
+      id: item.id,
+      name: item.name,
+      qty: item.qty,
+      priceCents: item.priceCents,
+      assignedTo: item.assignedTo.slice()
+    };
+  }
+
+  // Makes a new state object with the given fields replaced.
+  function withChanges(state, changes) {
+    var next = {};
+    var key;
+    for (key in state) {
+      if (Object.prototype.hasOwnProperty.call(state, key)) next[key] = state[key];
+    }
+    for (key in changes) {
+      if (Object.prototype.hasOwnProperty.call(changes, key)) next[key] = changes[key];
+    }
+    return next;
+  }
+
+  // Makes sure tipPercent is a number between 0 and 100. Anything else becomes 0.
+  function cleanTipPercent(value) {
+    var n = Number(value);
+    if (!isFinite(n) || n < 0) return 0;
+    if (n > 100) return 100;
+    return n;
+  }
+
+  // Returns the localStorage object, or null when there is none (Node, privacy mode).
+  function getStorage() {
+    try {
+      if (typeof localStorage !== "undefined" && localStorage) return localStorage;
+    } catch (e) {
+      // Some browsers throw just for touching localStorage when it is blocked.
+    }
+    return null;
+  }
+
+  /* ---------- IDs and state ---------- */
+
+  // Makes a short unique id like "i_k3j2h1".
+  function uid(prefix) {
+    uidCounter = uidCounter + 1;
+    var randomPart = Math.random().toString(36).slice(2, 7);
+    var counterPart = uidCounter.toString(36);
+    return (prefix || "id") + "_" + randomPart + counterPart;
+  }
+
+  // Returns a brand new, empty state.
+  function createInitialState() {
+    return {
+      step: "upload",
+      currency: "EUR",
+      items: [],
+      people: [],
+      taxCents: 0,
+      tipPercent: 0,
+      paymentLink: ""
+    };
+  }
+
+  /* ---------- Storage ---------- */
+
+  // Checks one saved item and returns a clean copy, or null if it is broken.
+  function cleanLoadedItem(raw) {
+    if (!raw || typeof raw.id !== "string" || !isNonNegativeInt(raw.priceCents)) return null;
+    var assigned = Array.isArray(raw.assignedTo) ? raw.assignedTo.filter(function (id) {
+      return typeof id === "string";
+    }) : [];
+    return {
+      id: raw.id,
+      name: typeof raw.name === "string" ? raw.name : "",
+      qty: isNonNegativeInt(raw.qty) ? raw.qty : 1,
+      priceCents: raw.priceCents,
+      assignedTo: assigned
+    };
+  }
+
+  // Checks one saved person and returns a clean copy, or null if it is broken.
+  function cleanLoadedPerson(raw) {
+    if (!raw || typeof raw.id !== "string" || typeof raw.name !== "string") return null;
+    return { id: raw.id, name: raw.name };
+  }
+
+  // Reads the saved state. Returns null if nothing is saved or it is corrupt.
+  function loadState() {
+    var storage = getStorage();
+    if (!storage) return null;
+    try {
+      var text = storage.getItem(STORAGE_KEY);
+      if (!text) return null;
+      var raw = JSON.parse(text);
+      if (!raw || typeof raw !== "object") return null;
+      if (!Array.isArray(raw.items) || !Array.isArray(raw.people)) return null;
+
+      var items = raw.items.map(cleanLoadedItem);
+      var people = raw.people.map(cleanLoadedPerson);
+      if (items.indexOf(null) !== -1 || people.indexOf(null) !== -1) return null;
+
+      var state = createInitialState();
+      state.step = STEPS.indexOf(raw.step) !== -1 ? raw.step : "upload";
+      state.currency = typeof raw.currency === "string" && raw.currency ? raw.currency : "EUR";
+      state.items = items;
+      state.people = people;
+      state.taxCents = isNonNegativeInt(raw.taxCents) ? raw.taxCents : 0;
+      state.tipPercent = cleanTipPercent(raw.tipPercent);
+      state.paymentLink = typeof raw.paymentLink === "string" ? raw.paymentLink : "";
+      return state;
+    } catch (e) {
+      return null; // Broken JSON counts as "nothing saved".
+    }
+  }
+
+  // Saves the state. Does nothing if storage is unavailable or full.
+  function saveState(state) {
+    var storage = getStorage();
+    if (!storage) return;
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      // Storage full or blocked: the app keeps working, it just won't remember.
+    }
+  }
+
+  // Deletes the saved state.
+  function clearState() {
+    var storage = getStorage();
+    if (!storage) return;
+    try {
+      storage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      // Nothing to do.
+    }
+  }
+
+  /* ---------- Money in and out ---------- */
+
+  // Turns cents into a localized string such as "12,50 €".
+  function formatMoney(cents, currency) {
+    var code = currency || "EUR";
+    var amount = cents / 100; // Only place we divide: turning cents into display text.
+    try {
+      return new Intl.NumberFormat("fi-FI", { style: "currency", currency: code }).format(amount);
+    } catch (e) {
+      return formatPlainAmount(cents) + " " + code; // Unknown currency code.
+    }
+  }
+
+  // Turns cents into plain text like "44,44" using whole-number math only.
+  function formatPlainAmount(cents) {
+    var sign = cents < 0 ? "-" : "";
+    var abs = Math.abs(cents);
+    var euros = Math.floor(abs / 100);
+    var rest = abs % 100;
+    var restText = rest < 10 ? "0" + rest : String(rest);
+    return sign + euros + "," + restText;
+  }
+
+  // Turns typed text into cents. "12.5", "12,50", " 12 " all work.
+  // Returns null for anything that is not a plain non-negative amount.
+  function parseMoneyInput(text) {
+    if (typeof text !== "string" && typeof text !== "number") return null;
+    var clean = String(text).trim();
+    var match = /^(\d+)(?:[.,](\d{1,2}))?$/.exec(clean);
+    if (!match) return null;
+
+    var whole = parseInt(match[1], 10);
+    var decimals = match[2] || "";
+    if (decimals.length === 1) decimals = decimals + "0"; // "5" means 50 cents.
+    var fraction = decimals ? parseInt(decimals, 10) : 0;
+
+    var cents = whole * 100 + fraction;
+    if (!Number.isSafeInteger(cents)) return null;
+    return cents;
+  }
+
+  /* ---------- Items ---------- */
+
+  // Adds a new item and returns the new state.
+  function addItem(state, fields) {
+    var f = fields || {};
+    var item = {
+      id: uid("i"),
+      name: typeof f.name === "string" ? f.name.trim() : "",
+      qty: isNonNegativeInt(f.qty) && f.qty > 0 ? f.qty : 1,
+      priceCents: isNonNegativeInt(f.priceCents) ? f.priceCents : 0,
+      assignedTo: []
+    };
+    return withChanges(state, { items: state.items.concat([item]) });
+  }
+
+  // Changes name, qty or priceCents of one item. Bad values are ignored.
+  function updateItem(state, itemId, patch) {
+    var p = patch || {};
+    var items = state.items.map(function (item) {
+      if (item.id !== itemId) return item;
+      var next = copyItem(item);
+      if (typeof p.name === "string") next.name = p.name;
+      if (isNonNegativeInt(p.qty) && p.qty > 0) next.qty = p.qty;
+      if (isNonNegativeInt(p.priceCents)) next.priceCents = p.priceCents;
+      return next;
+    });
+    return withChanges(state, { items: items });
+  }
+
+  // Removes one item.
+  function removeItem(state, itemId) {
+    var items = state.items.filter(function (item) {
+      return item.id !== itemId;
+    });
+    return withChanges(state, { items: items });
+  }
+
+  /* ---------- People ---------- */
+
+  // Adds a person. Empty names are rejected (the same state comes back).
+  function addPerson(state, name) {
+    var clean = typeof name === "string" ? name.trim() : "";
+    if (clean === "") return state;
+    var person = { id: uid("p"), name: clean };
+    return withChanges(state, { people: state.people.concat([person]) });
+  }
+
+  // Removes a person and takes them off every item they were assigned to.
+  function removePerson(state, personId) {
+    var people = state.people.filter(function (person) {
+      return person.id !== personId;
+    });
+    var items = state.items.map(function (item) {
+      if (item.assignedTo.indexOf(personId) === -1) return item;
+      var next = copyItem(item);
+      next.assignedTo = next.assignedTo.filter(function (id) {
+        return id !== personId;
+      });
+      return next;
+    });
+    return withChanges(state, { people: people, items: items });
+  }
+
+  // Puts a person on an item, or takes them off if they were already on it.
+  function toggleAssignment(state, itemId, personId) {
+    var personExists = state.people.some(function (p) {
+      return p.id === personId;
+    });
+    if (!personExists) return state;
+
+    var items = state.items.map(function (item) {
+      if (item.id !== itemId) return item;
+      var next = copyItem(item);
+      var at = next.assignedTo.indexOf(personId);
+      if (at === -1) next.assignedTo.push(personId);
+      else next.assignedTo.splice(at, 1);
+      return next;
+    });
+    return withChanges(state, { items: items });
+  }
+
+  /* ---------- Splitting math ---------- */
+
+  // Splits amountCents evenly into `count` parts.
+  // Leftover cents go one each to the first parts. Example: 100 / 3 -> [34, 33, 33].
+  function splitEvenly(amountCents, count) {
+    var base = Math.floor(amountCents / count);
+    var leftover = amountCents - base * count;
+    var parts = [];
+    for (var i = 0; i < count; i++) {
+      parts.push(i < leftover ? base + 1 : base);
+    }
+    return parts;
+  }
+
+  // Splits amountCents in proportion to weights using the largest remainder method.
+  // Everyone first gets the rounded-down share. The cents still left over go one
+  // each to the biggest remainders; ties go to whoever comes first.
+  // Uses whole numbers only, so no cent is lost or invented.
+  function splitByWeight(amountCents, weights) {
+    var totalWeight = 0;
+    var i;
+    for (i = 0; i < weights.length; i++) totalWeight += weights[i];
+    if (weights.length === 0) return [];
+    if (totalWeight === 0) return splitEvenly(amountCents, weights.length);
+
+    var shares = [];
+    var remainders = [];
+    var given = 0;
+    for (i = 0; i < weights.length; i++) {
+      var product = amountCents * weights[i];
+      var share = Math.floor(product / totalWeight);
+      shares.push(share);
+      remainders.push({ index: i, rest: product - share * totalWeight });
+      given += share;
+    }
+
+    // Biggest remainder first; on a tie, keep people[] order.
+    remainders.sort(function (a, b) {
+      if (b.rest !== a.rest) return b.rest - a.rest;
+      return a.index - b.index;
+    });
+
+    var left = amountCents - given;
+    for (i = 0; i < left; i++) {
+      shares[remainders[i].index] += 1;
+    }
+    return shares;
+  }
+
+  // Returns the ids on an item that belong to real people, in people[] order.
+  function validAssignees(item, people) {
+    return people
+      .filter(function (person) {
+        return item.assignedTo.indexOf(person.id) !== -1;
+      })
+      .map(function (person) {
+        return person.id;
+      });
+  }
+
+  // Works out what everyone owes. Never throws.
+  function computeTotals(state) {
+    var s = state || {};
+    var items = Array.isArray(s.items) ? s.items : [];
+    var people = Array.isArray(s.people) ? s.people : [];
+    var taxCents = isNonNegativeInt(s.taxCents) ? s.taxCents : 0;
+    var tipPercent = cleanTipPercent(s.tipPercent);
+    var warnings = [];
+
+    // 1. Subtotal of every item on the bill.
+    var subtotalCents = 0;
+    items.forEach(function (item) {
+      if (isNonNegativeInt(item.priceCents)) subtotalCents += item.priceCents;
+    });
+
+    // 2. Tip is on the subtotal, before tax.
+    var tipCents = Math.round((subtotalCents * tipPercent) / 100);
+    var totalCents = subtotalCents + taxCents + tipCents;
+
+    // 3. One empty row per person.
+    var perPerson = people.map(function (person) {
+      return {
+        personId: person.id, name: person.name,
+        itemsCents: 0, taxCents: 0, tipCents: 0, totalCents: 0, lines: []
+      };
+    });
+    var rowById = {};
+    perPerson.forEach(function (row) {
+      rowById[row.personId] = row;
+    });
+
+    // 4. Split each item between its assigned people.
+    var unassignedItemIds = [];
+    items.forEach(function (item) {
+      var price = isNonNegativeInt(item.priceCents) ? item.priceCents : 0;
+      var ids = Array.isArray(item.assignedTo) ? validAssignees(item, people) : [];
+      if (ids.length === 0) {
+        unassignedItemIds.push(item.id);
+        return;
+      }
+      var parts = splitEvenly(price, ids.length);
+      ids.forEach(function (id, index) {
+        var row = rowById[id];
+        row.itemsCents += parts[index];
+        row.lines.push({ itemId: item.id, name: item.name, shareCents: parts[index] });
+      });
+    });
+
+    // 5. Share tax and tip in proportion to what each person ate.
+    if (perPerson.length > 0) {
+      var weights = perPerson.map(function (row) {
+        return row.itemsCents;
+      });
+      var taxShares = splitByWeight(taxCents, weights);
+      var tipShares = splitByWeight(tipCents, weights);
+      perPerson.forEach(function (row, index) {
+        row.taxCents = taxShares[index];
+        row.tipCents = tipShares[index];
+        row.totalCents = row.itemsCents + row.taxCents + row.tipCents;
+      });
+    }
+
+    // 6. Warnings.
+    if (people.length === 0) warnings.push("No people added yet");
+    if (items.length === 0) warnings.push("No items on the bill yet");
+    if (items.length > 0 && people.length > 0 && unassignedItemIds.length > 0) {
+      var n = unassignedItemIds.length;
+      warnings.push(n + (n === 1 ? " item unassigned" : " items unassigned"));
+    }
+
+    return {
+      subtotalCents: subtotalCents,
+      taxCents: taxCents,
+      tipCents: tipCents,
+      totalCents: totalCents,
+      unassignedItemIds: unassignedItemIds,
+      perPerson: perPerson,
+      warnings: warnings
+    };
+  }
+
+  /* ---------- Summary text ---------- */
+
+  // Turns a percent like 12.5 into "12,5" to match the money format.
+  function formatPercent(value) {
+    return String(value).replace(".", ",");
+  }
+
+  // Builds plain text that can be pasted into a group chat.
+  function buildSummaryText(state, totals) {
+    var t = totals || computeTotals(state);
+    var currency = (state && state.currency) || "EUR";
+    var lines = [];
+
+    lines.push("SplitIt - total " + formatPlainAmount(t.totalCents) + " " + currency);
+    t.perPerson.forEach(function (row) {
+      lines.push(row.name + ": " + formatPlainAmount(row.totalCents) + " " + currency);
+    });
+
+    var tip = cleanTipPercent(state && state.tipPercent);
+    if (tip > 0) lines.push("(tip " + formatPercent(tip) + "% included)");
+
+    var link = state && typeof state.paymentLink === "string" ? state.paymentLink.trim() : "";
+    if (link !== "") lines.push("Pay here: " + link);
+
+    t.warnings.forEach(function (warning) {
+      lines.push("Warning: " + warning);
+    });
+
+    return lines.join("\n");
+  }
+
+  /* ---------- Self test ---------- */
+
+  // Tiny repeatable random number generator, so test runs are the same every time.
+  function makeRandom(seed) {
+    var value = seed;
+    return function (min, max) {
+      value = (value * 1103515245 + 12345) % 2147483648;
+      return min + (value % (max - min + 1));
+    };
+  }
+
+  // Builds the golden test bill from the contract.
+  function buildGoldenState() {
+    var s = createInitialState();
+    s = addPerson(s, "Aino");
+    s = addPerson(s, "Bo");
+    s = addPerson(s, "Cleo");
+    s = withChanges(s, { tipPercent: 10 });
+    var ids = s.people.map(function (p) { return p.id; });
+
+    s = addItem(s, { name: "Pizza", qty: 1, priceCents: 1250 });
+    s = addItem(s, { name: "Pasta", qty: 1, priceCents: 1190 });
+    s = addItem(s, { name: "Salad", qty: 1, priceCents: 900 });
+    s = addItem(s, { name: "Nachos", qty: 1, priceCents: 700 });
+    var it = s.items;
+    s = toggleAssignment(s, it[0].id, ids[0]);
+    s = toggleAssignment(s, it[1].id, ids[1]);
+    s = toggleAssignment(s, it[2].id, ids[2]);
+    s = toggleAssignment(s, it[3].id, ids[0]);
+    s = toggleAssignment(s, it[3].id, ids[1]);
+    s = toggleAssignment(s, it[3].id, ids[2]);
+    return s;
+  }
+
+  // Finds a person's share of one item in a totals row.
+  function shareOf(row, itemName) {
+    for (var i = 0; i < row.lines.length; i++) {
+      if (row.lines[i].name === itemName) return row.lines[i].shareCents;
+    }
+    return null;
+  }
+
+  // Builds one random bill where every item is assigned to at least one person.
+  function buildRandomState(rand) {
+    var s = createInitialState();
+    var peopleCount = rand(1, 6);
+    var itemCount = rand(1, 10);
+    for (var p = 0; p < peopleCount; p++) s = addPerson(s, "P" + p);
+    for (var i = 0; i < itemCount; i++) {
+      s = addItem(s, { name: "Item" + i, qty: 1, priceCents: rand(0, 5000) });
+    }
+    s.items.forEach(function (item) {
+      var picked = 0;
+      s.people.forEach(function (person) {
+        if (rand(0, 1) === 1) {
+          s = toggleAssignment(s, item.id, person.id);
+          picked++;
+        }
+      });
+      if (picked === 0) s = toggleAssignment(s, item.id, s.people[0].id);
+    });
+    // Tip like 12.5%: a whole number of tenths between 0 and 100.
+    return withChanges(s, { taxCents: rand(0, 2000), tipPercent: rand(0, 1000) / 10 });
+  }
+
+  // Runs every check, logs PASS/FAIL for each, and returns the counts.
+  function selfTest() {
+    var passed = 0;
+    var failed = 0;
+
+    function check(label, ok) {
+      if (ok) passed++;
+      else failed++;
+      console.log((ok ? "PASS " : "FAIL ") + label);
+    }
+
+    // 1. Golden test.
+    var g = buildGoldenState();
+    var gt = computeTotals(g);
+    var rows = gt.perPerson;
+    check("golden: nachos shares 234/233/233",
+      shareOf(rows[0], "Nachos") === 234 && shareOf(rows[1], "Nachos") === 233 && shareOf(rows[2], "Nachos") === 233);
+    check("golden: subtotal 4040", gt.subtotalCents === 4040);
+    check("golden: tip 404", gt.tipCents === 404);
+    check("golden: total 4444", gt.totalCents === 4444);
+    check("golden: Aino 1633, Bo 1565, Cleo 1246",
+      rows[0].totalCents === 1633 && rows[1].totalCents === 1565 && rows[2].totalCents === 1246);
+    check("golden: person totals sum to 4444",
+      rows[0].totalCents + rows[1].totalCents + rows[2].totalCents === 4444);
+    check("golden: no warnings", gt.warnings.length === 0);
+    var expectedText = "SplitIt - total 44,44 EUR\nAino: 16,33 EUR\nBo: 15,65 EUR\nCleo: 12,46 EUR\n(tip 10% included)";
+    check("golden: summary text", buildSummaryText(g, gt) === expectedText);
+
+    // 2. 100 cents between 3 people.
+    var parts = splitEvenly(100, 3);
+    check("100 cents / 3 people = 34/33/33", parts[0] === 34 && parts[1] === 33 && parts[2] === 33);
+
+    // 3. Property test: 200 random bills, the per-person totals must add up exactly.
+    var rand = makeRandom(42);
+    var badBills = 0;
+    for (var n = 0; n < 200; n++) {
+      var rt = computeTotals(buildRandomState(rand));
+      var sum = 0;
+      rt.perPerson.forEach(function (row) { sum += row.totalCents; });
+      if (sum !== rt.totalCents || rt.unassignedItemIds.length !== 0) badBills++;
+    }
+    check("property: 200 random bills, sum(perPerson) === total", badBills === 0);
+
+    // 4. Edge cases: must not throw and must warn.
+    var empty = createInitialState();
+    var noPeople = addItem(empty, { name: "Soup", qty: 1, priceCents: 500 });
+    var unassigned = addPerson(addItem(addItem(empty, { name: "A", priceCents: 100 }), { name: "B", priceCents: 200 }), "Aino");
+    var cases = [
+      { label: "no people, no items", state: empty },
+      { label: "items but no people", state: noPeople },
+      { label: "unassigned items", state: unassigned }
+    ];
+    cases.forEach(function (c) {
+      var ok = false;
+      try {
+        var t = computeTotals(c.state);
+        buildSummaryText(c.state, t);
+        ok = t.warnings.length > 0;
+      } catch (e) {
+        ok = false;
+      }
+      check("edge: " + c.label + " does not throw and warns", ok);
+    });
+    var ut = computeTotals(unassigned);
+    check("edge: unassigned summary shows 'Warning: 2 items unassigned'",
+      buildSummaryText(unassigned, ut).indexOf("Warning: 2 items unassigned") !== -1);
+
+    // Extra: money parsing.
+    check("parseMoneyInput: '12.5' '12,50' ' 12 ' 'abc'",
+      parseMoneyInput("12.5") === 1250 && parseMoneyInput("12,50") === 1250 &&
+      parseMoneyInput(" 12 ") === 1200 && parseMoneyInput("abc") === null);
+
+    console.log("SplitIt selfTest: " + passed + " passed, " + failed + " failed");
+    return { passed: passed, failed: failed };
+  }
+
+  /* ---------- Export ---------- */
+
+  globalThis.SplitIt = globalThis.SplitIt || {};
+  globalThis.SplitIt.engine = {
+    uid: uid,
+    createInitialState: createInitialState,
+    loadState: loadState,
+    saveState: saveState,
+    clearState: clearState,
+    formatMoney: formatMoney,
+    parseMoneyInput: parseMoneyInput,
+    addItem: addItem,
+    updateItem: updateItem,
+    removeItem: removeItem,
+    addPerson: addPerson,
+    removePerson: removePerson,
+    toggleAssignment: toggleAssignment,
+    computeTotals: computeTotals,
+    buildSummaryText: buildSummaryText,
+    selfTest: selfTest
+  };
+})();
+
+// shell.js - the app frame. Holds the state, draws the header, and shows one screen at a time.
+// Screens are registered by input.js (upload, items, people) and ui.js (assign, results).
+globalThis.SplitIt = globalThis.SplitIt || {};
+
+(function (SplitIt) {
+  // The five steps, in the order the user walks through them.
+  var STEPS = ["upload", "items", "people", "assign", "results"];
+  var screens = {};   // stepName -> screen function
+  var state = null;   // the single source of truth (plain JSON)
+  var lastStep = null; // step drawn last time, so we only scroll up on a real step change
+
+  // Screens call this once to say "I know how to draw this step".
+  SplitIt.registerScreen = function (stepName, screenFn) {
+    screens[stepName] = screenFn;
+  };
+
+  // Replace the state, save it, and redraw (unless silent: used while typing).
+  function setState(newState, opts) {
+    state = newState;
+    SplitIt.engine.saveState(state);
+    if (!(opts && opts.silent)) render();
+  }
+
+  // Jump to another step, keeping all data.
+  function goTo(step) {
+    setState(Object.assign({}, state, { step: step }));
+  }
+
+  // Header: app name plus one dot per step, the current one filled.
+  function drawHeader(appEl) {
+    var header = document.createElement("header");
+    header.className = "row";
+    var name = document.createElement("strong");
+    name.textContent = "SplitIt";
+    var dots = document.createElement("span");
+    dots.className = "muted";
+    var current = STEPS.indexOf(state.step);
+    var text = "";
+    for (var i = 0; i < STEPS.length; i++) text += (i === current ? "\u25CF" : "\u25CB") + " ";
+    dots.textContent = text.trim();
+    dots.setAttribute("aria-label", "Step " + (current + 1) + " of " + STEPS.length);
+    header.appendChild(name);
+    header.appendChild(dots);
+    appEl.appendChild(header);
+  }
+
+  // Safety net: if a screen crashes, show what happened and a way out instead of a blank page.
+  function drawError(rootEl, err) {
+    rootEl.textContent = "";
+    var box = document.createElement("div");
+    box.className = "card warn stack";
+    var msg = document.createElement("p");
+    msg.textContent = "Something went wrong: " + (err && err.message ? err.message : String(err));
+    var btn = document.createElement("button");
+    btn.className = "btn btn-primary";
+    btn.textContent = "Start over";
+    btn.addEventListener("click", startOver);
+    box.appendChild(msg);
+    box.appendChild(btn);
+    rootEl.appendChild(box);
+  }
+
+  function startOver() {
+    SplitIt.engine.clearState();
+    setState(SplitIt.engine.createInitialState());
+  }
+
+  // Draw the whole page for the current step.
+  function render() {
+    var appEl = document.getElementById("app");
+    appEl.textContent = "";
+    drawHeader(appEl);
+    var rootEl = document.createElement("main");
+    rootEl.className = "screen";
+    appEl.appendChild(rootEl);
+    var screenFn = screens[state.step];
+    var ctx = { state: state, setState: setState, goTo: goTo, engine: SplitIt.engine };
+    try {
+      if (!screenFn) throw new Error("No screen called \"" + state.step + "\".");
+      screenFn(rootEl, ctx);
+    } catch (err) {
+      console.error(err);
+      drawError(rootEl, err);
+    }
+    if (state.step !== lastStep) window.scrollTo(0, 0);
+    lastStep = state.step;
+  }
+
+  // Boot: resume saved state if it's valid, otherwise begin fresh.
+  SplitIt.start = function () {
+    var saved = SplitIt.engine.loadState();
+    state = (saved && STEPS.indexOf(saved.step) !== -1) ? saved : SplitIt.engine.createInitialState();
+    if (/[?&]test=1\b/.test(location.search)) SplitIt.engine.selfTest();
+    render();
+  };
+})(globalThis.SplitIt);
+
+/* =====================================================================
+   input.js  (Agent 2: input flow)
+   Screens: "upload", "items", "people"  +  SplitIt.parseReceipt(file)
+
+   Everything sits inside one function wrapper (an IIFE) so this file adds
+   no globals except what it puts on globalThis.SplitIt.
+   ===================================================================== */
+(function () {
+  "use strict";
+
+  /* -------------------------------------------------------------------
+     SETTINGS: receipt reading uses Google Gemini.
+     ------------------------------------------------------------------- */
+
+  // TODO: paste your Gemini API key between the quotes to turn on receipt
+  // reading (get one at https://aistudio.google.com/apikey).
+  // WARNING: this whole app is one HTML file, so ANYONE who has the file can
+  // read the key. Only paste it into a private copy; never share or commit it.
+  // While it is EMPTY, "Read receipt" shows a friendly message and the user
+  // types the items by hand (no network is used).
+  const API_KEY = '';
+
+  // The Gemini model and web address we send the photo to.
+  const GEMINI_URL =
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
+  // The instruction we send to the vision model together with the photo.
+  // It must answer with ONLY a JSON object in exactly this shape.
+  const RECEIPT_PROMPT =
+    'You are reading a photo of a restaurant receipt. ' +
+    'Reply with ONLY a JSON object, no explanation and no markdown, in exactly this shape: ' +
+    '{"items":[{"name":string,"qty":number,"price":number}],"tax":number|null,"currency":string}. ' +
+    'Rules: one entry per purchased line. "price" is the LINE TOTAL exactly as printed on that line ' +
+    '(not the unit price), as a plain number like 12.50. "qty" is the quantity on that line, 1 if none is shown. ' +
+    'Do NOT include subtotal, total, VAT summary, tip, change, card or cash payment lines as items. ' +
+    '"tax" is a separately added tax amount only if the receipt adds tax on top of the items; ' +
+    'if prices already include VAT (as in Finland) use null. ' +
+    '"currency" is the ISO 4217 code such as "EUR". If unsure of the currency, use "EUR".';
+
+  /* ------------------------------------------------------------------- */
+
+  const SplitIt = (globalThis.SplitIt = globalThis.SplitIt || {});
+
+  // Settings for shrinking the photo before upload.
+  const MAX_IMAGE_EDGE = 1600; // pixels, longest side
+  const JPEG_QUALITY = 0.8;
+
+  /* =====================================================================
+     PART 1: RECEIPT PARSING
+     ===================================================================== */
+
+  // Load an image File into an <img> element.
+  function loadImage(file) {
+    return new Promise(function (resolve, reject) {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('That file could not be opened as an image. Try another photo.'));
+      };
+      img.src = url;
+    });
+  }
+
+  // Shrink the image so its longest side is at most MAX_IMAGE_EDGE,
+  // save it as JPEG, and return only the base64 part (no "data:" prefix).
+  async function imageToBase64Jpeg(file) {
+    const img = await loadImage(file);
+    let width = img.naturalWidth;
+    let height = img.naturalHeight;
+    const longest = Math.max(width, height);
+    if (longest > MAX_IMAGE_EDGE) {
+      const scale = MAX_IMAGE_EDGE / longest;
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const g = canvas.getContext('2d');
+    g.fillStyle = '#ffffff'; // white behind transparent PNGs
+    g.fillRect(0, 0, width, height);
+    g.drawImage(img, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+    return dataUrl.slice(dataUrl.indexOf(',') + 1);
+  }
+
+  /* ---------------------------------------------------------------
+     callVisionAPI(base64): ask Gemini to read the receipt photo.
+     How it works:
+       1. We POST one message to Gemini with two parts: our instructions
+          (RECEIPT_PROMPT) and the photo as base64 JPEG.
+       2. We ask for a JSON reply (responseMimeType) and temperature 0,
+          so the same photo gives the same answer.
+       3. Gemini puts its answer text in candidates[0].content.parts[0].text.
+          We return that text; parseModelText() checks it afterwards.
+     --------------------------------------------------------------- */
+  async function callVisionAPI(base64) {
+    const body = {
+      contents: [{
+        parts: [
+          { text: RECEIPT_PROMPT },
+          { inline_data: { mime_type: 'image/jpeg', data: base64 } }
+        ]
+      }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0 }
+    };
+
+    let res;
+    try {
+      res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      // fetch only fails like this when there is no connection at all.
+      throw new Error("Couldn't reach the receipt reader. Check your connection or enter items manually.");
+    }
+
+    if (!res.ok) {
+      throw new Error(friendlyHttpError(res.status));
+    }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      throw new Error("The receipt reader sent a broken answer. Try again or enter items manually.");
+    }
+    return getReplyText(data);
+  }
+
+  // Turn an HTTP status code from Gemini into a message a person understands.
+  function friendlyHttpError(status) {
+    if (status === 400 || status === 401 || status === 403) {
+      return 'The receipt reader refused the request (' + status + '). Check the API key, or enter items manually.';
+    }
+    if (status === 429) {
+      return 'The receipt reader is busy right now (too many requests). Wait a minute or enter items manually.';
+    }
+    return 'The receipt reader answered with an error (' + status + '). Try again or enter items manually.';
+  }
+
+  // Dig the answer text out of Gemini's reply, or throw if it isn't there
+  // (for example when Gemini blocked the image).
+  function getReplyText(data) {
+    const candidate = data && data.candidates && data.candidates[0];
+    const parts = candidate && candidate.content && candidate.content.parts;
+    const text = parts && parts[0] && parts[0].text;
+    if (typeof text !== 'string' || text.trim() === '') {
+      throw new Error("The receipt reader didn't send back any items. Try a clearer photo or enter items manually.");
+    }
+    return text;
+  }
+
+  // Remove ``` or ```json fences and keep only the {...} part.
+  function cleanModelText(text) {
+    let s = String(text).replace(/```(?:json)?/gi, '').trim();
+    const first = s.indexOf('{');
+    const last = s.lastIndexOf('}');
+    if (first !== -1 && last > first) {
+      s = s.slice(first, last + 1);
+    }
+    return s;
+  }
+
+  // True if x is a real number that is zero or more.
+  function isGoodAmount(x) {
+    return typeof x === 'number' && Number.isFinite(x) && x >= 0;
+  }
+
+  // Turn the model's raw text into { items, taxCents, currency }.
+  // Throws an Error with a friendly message if anything looks wrong.
+  function parseModelText(text) {
+    let data;
+    try {
+      data = JSON.parse(cleanModelText(text));
+    } catch (e) {
+      throw new Error("Couldn't understand the receipt reader's answer. Try again or enter items manually.");
+    }
+    if (!data || typeof data !== 'object' || !Array.isArray(data.items)) {
+      throw new Error("Couldn't find a list of items on that receipt. Try a clearer photo or enter items manually.");
+    }
+
+    const items = [];
+    for (let i = 0; i < data.items.length; i++) {
+      const raw = data.items[i] || {};
+      // Let the engine turn the price into cents (no float money math).
+      // It accepts 12.5, "12.50" and "12,50", and returns null if invalid.
+      // A line with a bad price (negative, 3+ decimals, not a number) is
+      // skipped instead of failing the whole receipt. The user can add it
+      // by hand on the items screen.
+      const priceCents = SplitIt.engine.parseMoneyInput(String(raw.price));
+      if (priceCents === null) {
+        continue;
+      }
+      let qty = typeof raw.qty === 'string' ? Number(raw.qty) : raw.qty;
+      if (!isGoodAmount(qty) || qty === 0) {
+        qty = 1;
+      }
+      let name = typeof raw.name === 'string' ? raw.name.trim() : '';
+      if (name === '') {
+        name = 'Item ' + (i + 1);
+      }
+      items.push({ name: name, qty: qty, priceCents: priceCents });
+    }
+    if (items.length === 0) {
+      throw new Error('No readable items were found on that receipt. Try a clearer photo or enter the items by hand.');
+    }
+
+    let taxCents = 0;
+    if (data.tax !== null && data.tax !== undefined) {
+      taxCents = SplitIt.engine.parseMoneyInput(String(data.tax));
+      if (taxCents === null) {
+        throw new Error("The tax amount on the receipt couldn't be read. Please check it manually.");
+      }
+    }
+
+    let currency = 'EUR';
+    if (typeof data.currency === 'string' && /^[A-Za-z]{3}$/.test(data.currency.trim())) {
+      currency = data.currency.trim().toUpperCase();
+    }
+
+    return { items: items, taxCents: taxCents, currency: currency };
+  }
+
+  // PUBLIC: SplitIt.parseReceipt(imageFile)
+  // -> Promise<{ items: [{name, qty, priceCents}], taxCents, currency }>
+  SplitIt.parseReceipt = async function parseReceipt(imageFile) {
+    if (!imageFile) {
+      throw new Error('Please choose a photo of the receipt first.');
+    }
+    if (imageFile.type && imageFile.type.indexOf('image/') !== 0) {
+      throw new Error('That file is not an image. Please choose a photo of the receipt.');
+    }
+
+    // No key yet: stop with a friendly message so the user types the items.
+    if (API_KEY === '') {
+      throw new Error("Receipt reading isn't set up yet. Enter the items by hand.");
+    }
+
+    const base64 = await imageToBase64Jpeg(imageFile);
+    let text;
+    try {
+      text = await callVisionAPI(base64);
+    } catch (e) {
+      // Keep our own friendly messages; replace network gibberish.
+      const msg = e && e.message ? e.message : '';
+      throw new Error(msg || "Couldn't reach the receipt reader. Check your connection or enter items manually.");
+    }
+    return parseModelText(text);
+  };
+
+  /* =====================================================================
+     PART 2: SMALL DOM HELPERS
+     ===================================================================== */
+
+  // Make an element with an optional class name and optional text.
+  // Text always goes in with textContent (never innerHTML).
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  function button(label, className, onClick) {
+    const b = el('button', className, label);
+    b.type = 'button';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  // 1234 -> "12.34" (plain text for an editable price field, no symbol).
+  function centsToPlain(cents) {
+    const whole = Math.floor(cents / 100);
+    const rest = cents % 100;
+    return whole + '.' + (rest < 10 ? '0' : '') + rest;
+  }
+
+  /* =====================================================================
+     PART 3: SCREEN "upload"
+     ===================================================================== */
+
+  // The chosen photo is not part of saved state (it is not JSON),
+  // so we remember it here while the page is open.
+  let chosenFile = null;
+  let chosenPreviewUrl = '';
+
+  // Set to true by the items screen's Back button, so the upload screen
+  // knows the user just went back (keep the photo) and not "Start over".
+  let cameBackFromItems = false;
+
+  // Forget everything this file remembers outside of state. Used after
+  // "Start over", so an old photo or half-typed name doesn't come back.
+  function resetLocalMemory() {
+    if (chosenPreviewUrl) URL.revokeObjectURL(chosenPreviewUrl);
+    chosenFile = null;
+    chosenPreviewUrl = '';
+    resetItemDrafts();
+    personDraft = '';
+  }
+
+  function renderUpload(root, ctx) {
+    // An empty state (no items, no people) means the user started over,
+    // UNLESS they just pressed Back on the items screen. Then keep the photo.
+    const isEmpty = ctx.state.items.length === 0 && ctx.state.people.length === 0;
+    if (isEmpty && !cameBackFromItems) {
+      resetLocalMemory();
+    }
+    cameBackFromItems = false; // the flag is used once, then cleared
+
+    const screen = el('div', 'stack in-upload');
+    screen.appendChild(el('h1', 'title', 'Scan your receipt'));
+    screen.appendChild(el('p', 'muted', 'Take a photo of the bill, or pick one from your gallery.'));
+
+    // File picker. The label is styled as a big button.
+    const pickLabel = el('label', 'btn in-pick');
+    pickLabel.appendChild(document.createTextNode(chosenFile ? 'Choose a different photo' : 'Take or choose photo'));
+    const fileInput = el('input', 'in-file');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.setAttribute('capture', 'environment');
+    pickLabel.appendChild(fileInput);
+    screen.appendChild(pickLabel);
+
+    // Error message area. It sits ABOVE the preview so a tall photo
+    // can't push it down under the sticky button bar.
+    const errorBox = el('p', 'warn in-error');
+    errorBox.setAttribute('role', 'alert');
+    screen.appendChild(errorBox);
+
+    // Preview area.
+    const previewBox = el('div', 'card in-preview');
+    const previewImg = el('img', 'in-preview-img');
+    previewImg.alt = 'Receipt preview';
+    previewBox.appendChild(previewImg);
+    screen.appendChild(previewBox);
+
+    // Bottom buttons.
+    const bar = el('div', 'sticky-bar stack');
+    const readBtn = button('Read receipt', 'btn btn-primary in-read', onRead);
+    const manualLink = button('Enter manually', 'btn btn-ghost in-link', function () {
+      ctx.goTo('items');
+    });
+    bar.appendChild(readBtn);
+    bar.appendChild(manualLink);
+    screen.appendChild(bar);
+
+    root.appendChild(screen);
+
+    function showPreview() {
+      if (chosenPreviewUrl) {
+        previewImg.src = chosenPreviewUrl;
+        previewBox.hidden = false;
+      } else {
+        previewBox.hidden = true;
+      }
+      readBtn.disabled = !chosenFile;
+    }
+
+    function showError(message) {
+      errorBox.textContent = message || '';
+      errorBox.hidden = !message;
+    }
+
+    function setLoading(isLoading) {
+      readBtn.disabled = isLoading || !chosenFile;
+      readBtn.textContent = isLoading ? 'Reading receipt...' : 'Read receipt';
+      readBtn.classList.toggle('in-loading', isLoading);
+      fileInput.disabled = isLoading;
+      manualLink.disabled = isLoading;
+    }
+
+    fileInput.addEventListener('change', function () {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      if (chosenPreviewUrl) URL.revokeObjectURL(chosenPreviewUrl);
+      chosenFile = file;
+      chosenPreviewUrl = URL.createObjectURL(file);
+      pickLabel.firstChild.textContent = 'Choose a different photo';
+      showError('');
+      showPreview();
+    });
+
+    async function onRead() {
+      if (!chosenFile) return;
+      showError('');
+      setLoading(true);
+      try {
+        const result = await SplitIt.parseReceipt(chosenFile);
+        const engine = ctx.engine;
+        // Replace any old items with the ones from the receipt.
+        let state = Object.assign({}, ctx.state, { items: [] });
+        for (let i = 0; i < result.items.length; i++) {
+          state = engine.addItem(state, result.items[i]);
+        }
+        state = Object.assign({}, state, { taxCents: result.taxCents, currency: result.currency });
+        resetItemDrafts();
+        ctx.setState(state, { silent: true });
+        ctx.goTo('items');
+      } catch (e) {
+        setLoading(false);
+        showError(e && e.message ? e.message : 'Something went wrong reading the receipt. Try again or enter items manually.');
+      }
+    }
+
+    showPreview();
+    showError('');
+  }
+
+  /* =====================================================================
+     PART 4: SCREEN "items"
+     ===================================================================== */
+
+  // Text the user typed that is not (yet) a valid price. Keyed by item id.
+  // Valid prices live in state as priceCents; invalid text lives only here.
+  let priceDrafts = {};
+  let taxDraft = null; // null = no draft, use state.taxCents
+
+  function resetItemDrafts() {
+    priceDrafts = {};
+    taxDraft = null;
+  }
+
+  function renderItems(root, ctx) {
+    const engine = ctx.engine;
+    // Our own copy of state. Silent saves do not re-render, so ctx.state
+    // would get out of date; we always build on this variable instead.
+    let state = ctx.state;
+
+    const screen = el('div', 'stack in-items');
+    screen.appendChild(el('h1', 'title', 'Check the items'));
+    screen.appendChild(el('p', 'muted', 'Fix anything the receipt reader got wrong. Price is the total for the line.'));
+
+    const list = el('div', 'stack in-list');
+    screen.appendChild(list);
+
+    // Each row's message element, so we can update it without re-rendering.
+    const rowMessages = {};
+
+    if (state.items.length === 0) {
+      list.appendChild(el('p', 'muted in-empty', 'No items yet. Tap "Add item" to start.'));
+    }
+
+    for (let i = 0; i < state.items.length; i++) {
+      list.appendChild(buildRow(state.items[i]));
+    }
+
+    screen.appendChild(
+      button('+ Add item', 'btn btn-ghost in-add', function () {
+        const before = state.items.length;
+        state = engine.addItem(state, { name: '', qty: 1, priceCents: 0 });
+        const added = state.items[before] || state.items[state.items.length - 1];
+        if (added) priceDrafts[added.id] = ''; // empty price until typed
+        ctx.setState(state); // re-render
+        focusLastName(root);
+      })
+    );
+
+    // Optional tax.
+    const taxCard = el('div', 'card stack in-tax');
+    const taxLabel = el('label', 'in-label', 'Tax added on top (optional)');
+    const taxInput = el('input', 'input in-tax-input');
+    taxInput.type = 'text';
+    taxInput.inputMode = 'decimal';
+    taxInput.placeholder = '0.00';
+    taxInput.value = taxDraft !== null ? taxDraft : state.taxCents ? centsToPlain(state.taxCents) : '';
+    taxLabel.appendChild(taxInput);
+    taxCard.appendChild(taxLabel);
+    taxCard.appendChild(el('p', 'muted in-small', 'Finnish receipts already include VAT, so usually leave this empty.'));
+    const taxMsg = el('p', 'warn in-row-msg');
+    taxCard.appendChild(taxMsg);
+    screen.appendChild(taxCard);
+
+    taxInput.addEventListener('input', function () {
+      const text = taxInput.value;
+      if (text.trim() === '') {
+        taxDraft = null;
+        state = Object.assign({}, state, { taxCents: 0 });
+        ctx.setState(state, { silent: true });
+      } else {
+        const cents = engine.parseMoneyInput(text);
+        if (cents === null) {
+          taxDraft = text;
+        } else {
+          taxDraft = null;
+          state = Object.assign({}, state, { taxCents: cents });
+          ctx.setState(state, { silent: true });
+        }
+      }
+      refresh();
+    });
+
+    // Subtotal and problems summary.
+    const subtotalLine = el('p', 'in-subtotal');
+    screen.appendChild(subtotalLine);
+    const problemsLine = el('p', 'warn in-problems');
+    screen.appendChild(problemsLine);
+
+    // Back / Next.
+    const bar = el('div', 'sticky-bar row');
+    bar.appendChild(button('Back', 'btn btn-ghost', function () {
+      cameBackFromItems = true; // tells the upload screen to keep the photo
+      ctx.goTo('upload');
+    }));
+    const nextBtn = button('Next', 'btn btn-primary', function () {
+      if (!nextBtn.disabled) ctx.goTo('people');
+    });
+    bar.appendChild(nextBtn);
+    screen.appendChild(bar);
+
+    root.appendChild(screen);
+    refresh();
+
+    // Build one editable row for an item.
+    function buildRow(item) {
+      const row = el('div', 'card stack in-item');
+      const fields = el('div', 'row in-item-fields');
+
+      const nameInput = el('input', 'input in-name');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Item name';
+      nameInput.value = item.name;
+      nameInput.setAttribute('aria-label', 'Item name');
+
+      const qtyInput = el('input', 'input in-qty');
+      qtyInput.type = 'number';
+      qtyInput.min = '1';
+      qtyInput.step = '1';
+      qtyInput.inputMode = 'numeric';
+      qtyInput.value = String(item.qty);
+      qtyInput.setAttribute('aria-label', 'Quantity');
+
+      const priceInput = el('input', 'input in-price');
+      priceInput.type = 'text';
+      priceInput.inputMode = 'decimal';
+      priceInput.placeholder = '0.00';
+      priceInput.value = item.id in priceDrafts ? priceDrafts[item.id] : centsToPlain(item.priceCents);
+      priceInput.setAttribute('aria-label', 'Line price');
+
+      const del = button('\u00d7', 'btn btn-ghost in-del', function () {
+        delete priceDrafts[item.id];
+        state = engine.removeItem(state, item.id);
+        ctx.setState(state); // re-render
+      });
+      del.setAttribute('aria-label', 'Delete item');
+
+      fields.appendChild(nameInput);
+      fields.appendChild(qtyInput);
+      fields.appendChild(priceInput);
+      fields.appendChild(del);
+      row.appendChild(fields);
+
+      const msg = el('p', 'warn in-row-msg');
+      row.appendChild(msg);
+      rowMessages[item.id] = { msg: msg, row: row };
+
+      nameInput.addEventListener('input', function () {
+        state = engine.updateItem(state, item.id, { name: nameInput.value });
+        ctx.setState(state, { silent: true });
+        refresh();
+      });
+
+      qtyInput.addEventListener('input', function () {
+        const n = parseInt(qtyInput.value, 10);
+        if (Number.isFinite(n) && n >= 1) {
+          state = engine.updateItem(state, item.id, { qty: n });
+          ctx.setState(state, { silent: true });
+        }
+      });
+
+      priceInput.addEventListener('input', function () {
+        const cents = engine.parseMoneyInput(priceInput.value);
+        if (cents === null) {
+          priceDrafts[item.id] = priceInput.value;
+        } else {
+          delete priceDrafts[item.id];
+          state = engine.updateItem(state, item.id, { priceCents: cents });
+          ctx.setState(state, { silent: true });
+        }
+        refresh();
+      });
+
+      return row;
+    }
+
+    // Recheck everything and update subtotal, messages and the Next button.
+    function refresh() {
+      let subtotal = 0;
+      const problems = [];
+
+      for (let i = 0; i < state.items.length; i++) {
+        const item = state.items[i];
+        const parts = rowMessages[item.id];
+        let message = '';
+        const label = item.name.trim() !== '' ? '"' + item.name.trim() + '"' : 'Item ' + (i + 1);
+
+        if (item.id in priceDrafts) {
+          message = priceDrafts[item.id].trim() === '' ? 'Enter a price.' : 'Price is not a valid amount (example: 12.50).';
+          problems.push(label + ': price');
+        } else {
+          subtotal += item.priceCents;
+        }
+        if (item.name.trim() === '') {
+          message = message ? message + ' Add a name.' : 'Add a name.';
+          if (!(item.id in priceDrafts)) problems.push(label + ': name');
+        }
+        if (parts) {
+          parts.msg.textContent = message;
+          parts.msg.hidden = message === '';
+          parts.row.classList.toggle('in-invalid', message !== '');
+        }
+      }
+
+      const taxBad = taxDraft !== null;
+      taxMsg.textContent = taxBad ? 'Tax is not a valid amount (example: 3.20).' : '';
+      taxMsg.hidden = !taxBad;
+      taxInput.classList.toggle('in-invalid-input', taxBad);
+      if (taxBad) problems.push('Tax');
+
+      subtotalLine.textContent = 'Subtotal: ' + engine.formatMoney(subtotal, state.currency);
+
+      if (state.items.length === 0) {
+        problemsLine.textContent = 'Add at least one item to continue.';
+      } else if (problems.length > 0) {
+        problemsLine.textContent = 'Fix before continuing: ' + problems.join(', ');
+      } else {
+        problemsLine.textContent = '';
+      }
+      problemsLine.hidden = problemsLine.textContent === '';
+      nextBtn.disabled = state.items.length === 0 || problems.length > 0;
+    }
+  }
+
+  // After "Add item" re-renders, put the cursor in the new row's name box.
+  function focusLastName(root) {
+    const names = root.querySelectorAll('.in-name');
+    if (names.length > 0) names[names.length - 1].focus();
+  }
+
+  /* =====================================================================
+     PART 5: SCREEN "people"
+     ===================================================================== */
+
+  let personDraft = ''; // half-typed name, kept across re-renders
+  let focusPersonInput = false; // true right after adding someone
+
+  function renderPeople(root, ctx) {
+    const engine = ctx.engine;
+    const state = ctx.state;
+
+    const screen = el('div', 'stack in-people');
+    screen.appendChild(el('h1', 'title', "Who's splitting?"));
+    screen.appendChild(el('p', 'muted', 'Add everyone at the table, including yourself.'));
+
+    const addRow = el('div', 'row in-add-person');
+    const nameInput = el('input', 'input in-person-input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'Name';
+    nameInput.value = personDraft;
+    nameInput.setAttribute('aria-label', 'Person name');
+    nameInput.enterKeyHint = 'done';
+    const addBtn = button('Add', 'btn btn-primary in-person-add', addPerson);
+    addRow.appendChild(nameInput);
+    addRow.appendChild(addBtn);
+    screen.appendChild(addRow);
+
+    // Chips for people already added.
+    const chips = el('div', 'row in-chips');
+    for (let i = 0; i < state.people.length; i++) {
+      chips.appendChild(buildChip(state.people[i]));
+    }
+    screen.appendChild(chips);
+
+    if (state.people.length === 0) {
+      screen.appendChild(el('p', 'muted in-hint', 'Nobody added yet.'));
+    } else if (state.people.length === 1) {
+      screen.appendChild(el('p', 'muted in-hint', 'Only one person so far. Add the others to split the bill.'));
+    }
+
+    const bar = el('div', 'sticky-bar row');
+    bar.appendChild(button('Back', 'btn btn-ghost', function () { ctx.goTo('items'); }));
+    const nextBtn = button('Next', 'btn btn-primary', function () {
+      if (state.people.length > 0) ctx.goTo('assign');
+    });
+    nextBtn.disabled = state.people.length === 0;
+    bar.appendChild(nextBtn);
+    screen.appendChild(bar);
+
+    root.appendChild(screen);
+
+    nameInput.addEventListener('input', function () {
+      personDraft = nameInput.value;
+    });
+    nameInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addPerson();
+      }
+    });
+
+    // Keep the keyboard open right after adding someone (only then).
+    if (focusPersonInput) {
+      focusPersonInput = false;
+      nameInput.focus();
+    }
+
+    function addPerson() {
+      const name = nameInput.value.trim();
+      if (name === '') return;
+      personDraft = '';
+      focusPersonInput = true;
+      ctx.setState(engine.addPerson(state, name)); // re-render
+    }
+
+    function buildChip(person) {
+      const chip = el('span', 'chip on in-chip');
+      chip.appendChild(el('span', 'in-chip-name', person.name));
+      const x = button('\u00d7', 'in-chip-x', function () {
+        ctx.setState(engine.removePerson(state, person.id)); // re-render
+      });
+      x.setAttribute('aria-label', 'Remove ' + person.name);
+      chip.appendChild(x);
+      return chip;
+    }
+  }
+
+  /* =====================================================================
+     PART 6: REGISTER THE SCREENS WITH THE SHELL
+     ===================================================================== */
+
+  SplitIt.registerScreen('upload', renderUpload);
+  SplitIt.registerScreen('items', renderItems);
+  SplitIt.registerScreen('people', renderPeople);
+})();
+
+globalThis.SplitIt = globalThis.SplitIt || {};
+
+/*
+  ui.js (Agent 3): the "assign" and "results" screens.
+
+  How it works, in short:
+  - The shell calls our screen function with (rootEl, ctx) every time it
+    re-renders. We empty rootEl and build the screen again from ctx.state.
+  - All logic (splitting, totals, formatting) lives in ctx.engine. This file
+    only builds the page and reacts to taps.
+  - Text that came from the user (names, items) is always set with
+    textContent, never innerHTML.
+  - Money is integer cents. We only turn it into a string with
+    engine.formatMoney(cents, state.currency) right before showing it.
+*/
+(function () {
+  "use strict";
+
+  var SplitIt = globalThis.SplitIt;
+
+  /* ------------------------------------------------------------------ */
+  /* UI-only memory. This is not part of the saved app state; it just    */
+  /* remembers things like "which person cards are open" across renders. */
+  /* ------------------------------------------------------------------ */
+  var expandedPersonIds = {};   // personId -> true when that card is open
+  var customTipOpen = false;    // true after the user taps the "Custom" tip chip
+
+  var PRESET_TIPS = [0, 5, 10, 15];
+
+  /* ------------------------------------------------------------------ */
+  /* Small DOM helpers                                                   */
+  /* ------------------------------------------------------------------ */
+
+  // Create an element with an optional class name and optional text.
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  // Create a <button type="button"> that calls onClick when tapped.
+  function button(className, text, onClick) {
+    var b = el("button", className, text);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  // Remove everything inside a node.
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  // A line with a label on the left and an amount on the right.
+  function spreadLine(leftText, rightText, className) {
+    var line = el("div", "ui-spread" + (className ? " " + className : ""));
+    line.appendChild(el("span", "", leftText));
+    line.appendChild(el("span", "ui-amount", rightText));
+    return line;
+  }
+
+  /* ================================================================== */
+  /* ASSIGN SCREEN                                                       */
+  /* ================================================================== */
+
+  function renderAssign(rootEl, ctx) {
+    var state = ctx.state;
+    clear(rootEl);
+
+    // The shell already wraps us in <main class="screen">, so we use .stack.
+    var screen = el("div", "stack");
+    screen.appendChild(el("h1", "title", "Who had what?"));
+
+    if (state.people.length === 0) {
+      screen.appendChild(el("p", "muted warn ui-warning", "Add some people first."));
+    }
+    if (state.items.length === 0) {
+      screen.appendChild(el("p", "muted", "No items on the bill yet."));
+    }
+
+    var list = el("div", "stack");
+    for (var i = 0; i < state.items.length; i++) {
+      list.appendChild(buildItemCard(state.items[i], state, ctx));
+    }
+    screen.appendChild(list);
+
+    screen.appendChild(buildAssignBar(state, ctx));
+    rootEl.appendChild(screen);
+  }
+
+  // One card per item: name, price, a chip per person, an "Everyone" chip,
+  // and a "split N ways" note when 2+ people share it.
+  function buildItemCard(item, state, ctx) {
+    var engine = ctx.engine;
+    var isUnassigned = item.assignedTo.length === 0;
+    var card = el("div", isUnassigned ? "card warn stack" : "card stack");
+
+    var nameText = item.name;
+    if (item.qty && item.qty > 1) nameText = item.qty + " × " + item.name;
+    var head = el("div", "ui-spread");
+    head.appendChild(el("span", "ui-item-name", nameText));
+    head.appendChild(el("span", "ui-amount", engine.formatMoney(item.priceCents, state.currency)));
+    card.appendChild(head);
+
+    var chips = el("div", "row");
+    for (var p = 0; p < state.people.length; p++) {
+      chips.appendChild(buildPersonChip(item, state.people[p], ctx));
+    }
+    if (state.people.length > 0) {
+      chips.appendChild(buildEveryoneChip(item, state, ctx));
+    }
+    card.appendChild(chips);
+
+    card.appendChild(el("div", "muted", splitNote(item, state, engine)));
+    return card;
+  }
+
+  // Chip for one person. Tapping it toggles that person on this item.
+  function buildPersonChip(item, person, ctx) {
+    var isOn = item.assignedTo.indexOf(person.id) !== -1;
+    var chip = button(isOn ? "chip on" : "chip", person.name, function () {
+      ctx.setState(ctx.engine.toggleAssignment(ctx.state, item.id, person.id));
+    });
+    chip.setAttribute("aria-pressed", isOn ? "true" : "false");
+    return chip;
+  }
+
+  // "Everyone" chip: puts all people on the item. If all are already on it,
+  // it clears the item instead. Assignments only change through
+  // engine.toggleAssignment, so we toggle exactly the people that need it:
+  //   - turning everyone ON:  toggle each person who is currently off
+  //   - turning everyone OFF: toggle each person who is currently on
+  function buildEveryoneChip(item, state, ctx) {
+    var everyoneOn = allPeopleAssigned(item, state.people);
+    var chip = button(everyoneOn ? "chip on" : "chip", "Everyone", function () {
+      var s = ctx.state;   // fresh for this render (the shell gives a new ctx each time)
+      for (var i = 0; i < s.people.length; i++) {
+        var personId = s.people[i].id;
+        var isOn = item.assignedTo.indexOf(personId) !== -1;
+        var needsToggle = everyoneOn ? isOn : !isOn;
+        if (needsToggle) s = ctx.engine.toggleAssignment(s, item.id, personId);
+      }
+      ctx.setState(s);
+    });
+    chip.setAttribute("aria-pressed", everyoneOn ? "true" : "false");
+    return chip;
+  }
+
+  function allPeopleAssigned(item, people) {
+    if (people.length === 0) return false;
+    for (var i = 0; i < people.length; i++) {
+      if (item.assignedTo.indexOf(people[i].id) === -1) return false;
+    }
+    return true;
+  }
+
+  // Text under the chips: "Not assigned yet", "Aino pays", or
+  // "split 3 ways: about 2,33 € each".
+  function splitNote(item, state, engine) {
+    var n = item.assignedTo.length;
+    if (n === 0) return "Not assigned yet: tap who had it.";
+    if (n === 1) return "One person pays all of it.";
+    var share = Math.floor(item.priceCents / n);           // even share in whole cents
+    var hasRemainder = item.priceCents % n !== 0;           // some people pay 1 cent more
+    return "split " + n + " ways: " + (hasRemainder ? "about " : "") +
+      engine.formatMoney(share, state.currency) + " each";
+  }
+
+  // Sticky bottom bar: Back (to people) and Next (to results).
+  // Next is always allowed, but tells you how many items have nobody.
+  function buildAssignBar(state, ctx) {
+    var unassigned = 0;
+    for (var i = 0; i < state.items.length; i++) {
+      if (state.items[i].assignedTo.length === 0) unassigned++;
+    }
+    var bar = el("div", "sticky-bar");
+    bar.appendChild(button("btn btn-ghost", "Back", function () { ctx.goTo("people"); }));
+    var nextLabel = "Next";
+    if (unassigned > 0) nextLabel = "Next (" + unassigned + " unassigned)";
+    bar.appendChild(button("btn btn-primary", nextLabel, function () { ctx.goTo("results"); }));
+    return bar;
+  }
+
+  /* ================================================================== */
+  /* RESULTS SCREEN                                                      */
+  /* ================================================================== */
+
+  function renderResults(rootEl, ctx) {
+    var engine = ctx.engine;
+    // "current" holds the latest state. Silent setState calls (typing) do not
+    // re-render, so we keep our own copy up to date here.
+    var current = { state: ctx.state };
+    clear(rootEl);
+
+    var screen = el("div", "stack");   // the shell already adds .screen around us
+    screen.appendChild(el("h1", "title", "Who pays what"));
+
+    // Warnings go at the very top. They and the person cards are rebuilt on
+    // their own without touching the tip input, so the input keeps focus.
+    var warningsArea = el("div", "stack");
+    var totalsArea = el("div", "stack");
+
+    function refreshTotals() {
+      var totals = engine.computeTotals(current.state);
+      buildWarnings(warningsArea, totals);
+      buildTotalsArea(totalsArea, current.state, engine, totals);
+    }
+
+    // Save a new state without re-rendering, then update the totals by hand.
+    function saveSilently(newState) {
+      current.state = newState;
+      ctx.setState(newState, { silent: true });
+      refreshTotals();
+    }
+
+    screen.appendChild(warningsArea);
+    screen.appendChild(buildTipSection(current, ctx, saveSilently));
+    screen.appendChild(totalsArea);
+    screen.appendChild(buildPaymentSection(current, ctx, saveSilently));
+    screen.appendChild(buildCopySection(current, engine));
+    refreshTotals();
+
+    screen.appendChild(buildResultsBar(ctx));
+    rootEl.appendChild(screen);
+  }
+
+  /* ---------- Tip ---------- */
+
+  // Tip chips 0 / 5 / 10 / 15 / Custom, plus a number input for Custom.
+  function buildTipSection(current, ctx, saveSilently) {
+    var section = el("div", "card stack");
+    section.appendChild(el("div", "ui-label", "Tip"));
+
+    var tip = current.state.tipPercent;
+    var isPreset = PRESET_TIPS.indexOf(tip) !== -1;
+    var showCustom = customTipOpen || !isPreset;
+
+    var chips = el("div", "row");
+    for (var i = 0; i < PRESET_TIPS.length; i++) {
+      chips.appendChild(buildTipChip(PRESET_TIPS[i], !showCustom && tip === PRESET_TIPS[i], current, ctx));
+    }
+    chips.appendChild(button(showCustom ? "chip on" : "chip", "Custom", function () {
+      customTipOpen = true;
+      ctx.setState(current.state);   // re-render to show the input
+    }));
+    section.appendChild(chips);
+
+    if (showCustom) {
+      section.appendChild(buildCustomTipInput(current, saveSilently));
+    }
+    return section;
+  }
+
+  // Preset chip: sets tipPercent and re-renders (no input to lose focus here).
+  // We read current.state (not ctx.state) so silent edits, like a typed
+  // payment link, are not thrown away.
+  function buildTipChip(percent, isOn, current, ctx) {
+    return button(isOn ? "chip on" : "chip", percent + " %", function () {
+      customTipOpen = false;
+      ctx.setState(copyWith(current.state, { tipPercent: percent }));
+    });
+  }
+
+  // Custom tip input. While typing we save silently and only redraw the
+  // totals, so the input never loses focus.
+  function buildCustomTipInput(current, saveSilently) {
+    var label = el("label", "stack");
+    label.appendChild(el("span", "muted", "Custom tip (%)"));
+    var input = el("input", "input");
+    input.type = "text";
+    input.inputMode = "decimal";
+    input.placeholder = "e.g. 12.5";
+    input.value = String(current.state.tipPercent);
+    input.addEventListener("input", function () {
+      var percent = parsePercent(input.value);
+      if (percent === null) return;   // ignore half-typed or bad values
+      saveSilently(copyWith(current.state, { tipPercent: percent }));
+    });
+    label.appendChild(input);
+    return label;
+  }
+
+  // Turn "12,5" or "12.5" into 12.5. Returns null if not a number in 0..100.
+  // Empty input counts as 0.
+  function parsePercent(text) {
+    var cleaned = String(text).trim().replace(",", ".");
+    if (cleaned === "") return 0;
+    if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+    var value = Number(cleaned);
+    if (value < 0 || value > 100) return null;
+    return value;
+  }
+
+  // Make a shallow copy of state with some fields changed (state is never mutated).
+  function copyWith(state, patch) {
+    var copy = {};
+    var key;
+    for (key in state) if (Object.prototype.hasOwnProperty.call(state, key)) copy[key] = state[key];
+    for (key in patch) if (Object.prototype.hasOwnProperty.call(patch, key)) copy[key] = patch[key];
+    return copy;
+  }
+
+  /* ---------- Warnings (top of screen) ---------- */
+
+  // One warning box per message from computeTotals. Hidden when there are none.
+  function buildWarnings(area, totals) {
+    clear(area);
+    area.hidden = totals.warnings.length === 0;
+    for (var w = 0; w < totals.warnings.length; w++) {
+      area.appendChild(el("div", "warn ui-warning", totals.warnings[w]));
+    }
+  }
+
+  /* ---------- Totals: one card per person + bill total ---------- */
+
+  // totals is optional; if missing we compute it here.
+  function buildTotalsArea(area, state, engine, totals) {
+    clear(area);
+    if (!totals) totals = engine.computeTotals(state);
+
+    for (var i = 0; i < totals.perPerson.length; i++) {
+      area.appendChild(buildPersonCard(totals.perPerson[i], state, area, engine));
+    }
+
+    var grand = el("div", "card stack");
+    grand.appendChild(spreadLine("Subtotal", engine.formatMoney(totals.subtotalCents, state.currency), "muted"));
+    if (totals.taxCents) grand.appendChild(spreadLine("Tax", engine.formatMoney(totals.taxCents, state.currency), "muted"));
+    if (totals.tipCents) grand.appendChild(spreadLine("Tip", engine.formatMoney(totals.tipCents, state.currency), "muted"));
+    grand.appendChild(spreadLine("Bill total", engine.formatMoney(totals.totalCents, state.currency), "ui-label"));
+    area.appendChild(grand);
+  }
+
+  // Person card: name and big total. Tap to open/close the breakdown.
+  function buildPersonCard(person, state, area, engine) {
+    var isOpen = expandedPersonIds[person.personId] === true;
+    var card = el("div", "card");
+    card.setAttribute("data-person-id", person.personId);
+
+    var head = el("button", "ui-person-head ui-spread");
+    head.type = "button";
+    head.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    head.appendChild(el("span", "ui-item-name", person.name));
+    head.appendChild(el("span", "ui-amount ui-big", engine.formatMoney(person.totalCents, state.currency)));
+    head.addEventListener("click", function () {
+      expandedPersonIds[person.personId] = !isOpen;
+      buildTotalsArea(area, state, engine);   // redraw only the totals
+    });
+    card.appendChild(head);
+
+    if (isOpen) card.appendChild(buildBreakdown(person, state, engine));
+    return card;
+  }
+
+  // The opened part of a person card: one line per item share, then tax and tip.
+  function buildBreakdown(person, state, engine) {
+    var box = el("div", "ui-breakdown stack");
+    for (var i = 0; i < person.lines.length; i++) {
+      var line = person.lines[i];
+      box.appendChild(spreadLine(line.name, engine.formatMoney(line.shareCents, state.currency)));
+    }
+    box.appendChild(spreadLine("Tax", engine.formatMoney(person.taxCents, state.currency), "muted"));
+    box.appendChild(spreadLine("Tip", engine.formatMoney(person.tipCents, state.currency), "muted"));
+    return box;
+  }
+
+  /* ---------- Payment link ---------- */
+
+  function buildPaymentSection(current, ctx, saveSilently) {
+    var label = el("label", "card stack");
+    label.appendChild(el("span", "ui-label", "Payment link (optional)"));
+    var input = el("input", "input");
+    input.type = "url";
+    input.placeholder = "https://...";
+    input.value = current.state.paymentLink || "";
+    input.addEventListener("input", function () {
+      // Silent save: no re-render, so typing keeps focus.
+      current.state = copyWith(current.state, { paymentLink: input.value });
+      ctx.setState(current.state, { silent: true });
+    });
+    label.appendChild(input);
+    return label;
+  }
+
+  /* ---------- Copy summary ---------- */
+
+  function buildCopySection(current, engine) {
+    var row = el("div", "row");
+    var status = el("span", "muted", "");
+    status.setAttribute("aria-live", "polite");
+    row.appendChild(button("btn btn-primary", "Copy summary", function () {
+      var state = current.state;
+      var text = engine.buildSummaryText(state, engine.computeTotals(state));
+      copyText(text, function (ok) {
+        status.textContent = ok ? "Copied" : "Could not copy";
+        setTimeout(function () { status.textContent = ""; }, 2000);
+      });
+    }));
+    row.appendChild(status);
+    return row;
+  }
+
+  // Copy text to the clipboard. Tries the modern API first, then falls back
+  // to the old "select a hidden textarea and execCommand('copy')" trick.
+  // done(true/false) is called once at the end.
+  function copyText(text, done) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { done(true); },
+        function () { done(copyWithTextarea(text)); }
+      );
+      return;
+    }
+    done(copyWithTextarea(text));
+  }
+
+  function copyWithTextarea(text) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "-1000px";
+    document.body.appendChild(area);
+    area.select();
+    var ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      ok = false;
+    }
+    document.body.removeChild(area);
+    return ok;
+  }
+
+  /* ---------- Bottom bar ---------- */
+
+  function buildResultsBar(ctx) {
+    var bar = el("div", "sticky-bar");
+    bar.appendChild(button("btn btn-ghost", "Back", function () { ctx.goTo("assign"); }));
+    bar.appendChild(button("btn btn-ghost", "Start over", function () {
+      if (!confirm("Start over? This clears the whole bill.")) return;
+      expandedPersonIds = {};
+      customTipOpen = false;
+      ctx.engine.clearState();
+      ctx.setState(ctx.engine.createInitialState(), { silent: true });
+      ctx.goTo("upload");
+    }));
+    return bar;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Register both screens with the shell                                */
+  /* ------------------------------------------------------------------ */
+  SplitIt.registerScreen("assign", renderAssign);
+  SplitIt.registerScreen("results", renderResults);
+})();
+
+SplitIt.start();
+</script>
+</body>
+</html>

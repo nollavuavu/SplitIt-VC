@@ -1,0 +1,88 @@
+/* input.css (Agent 2): styles for the upload, items and people screens.
+   Only ".in-" classes live here; shared look comes from styles.css. */
+
+/* ---------- upload ---------- */
+.in-pick {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+/* The real file input is invisible but still clickable through the label. */
+.in-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.in-preview { padding: 8px; text-align: center; }
+.in-preview[hidden] { display: none; }
+.in-preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: 45vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.in-error[hidden],
+.in-row-msg[hidden],
+.in-problems[hidden] { display: none; }
+.in-link {
+  background: none;
+  border: none;
+  text-decoration: underline;
+}
+.in-loading { opacity: 0.7; cursor: progress; }
+.in-loading::after {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.5em;
+  vertical-align: -0.1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: in-spin 0.8s linear infinite;
+}
+@keyframes in-spin { to { transform: rotate(360deg); } }
+
+/* ---------- items ---------- */
+.in-item { padding: 10px; }
+.in-item-fields {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.in-name  { flex: 1 1 auto; min-width: 0; }
+.in-qty   { flex: 0 0 3.5em; width: 3.5em; text-align: center; }
+.in-price { flex: 0 0 5.5em; width: 5.5em; text-align: right; }
+.in-del   { flex: 0 0 auto; min-width: 2.5em; font-size: 1.2em; line-height: 1; }
+.in-invalid { outline: 2px solid var(--warn-text, #d9534f); outline-offset: -2px; }
+.in-invalid-input { border-color: var(--warn-text, #d9534f); }
+.in-row-msg { margin: 4px 0 0; font-size: 0.85em; }
+.in-label { display: flex; flex-direction: column; gap: 4px; }
+.in-small { font-size: 0.85em; margin: 0; }
+.in-subtotal { font-weight: 600; font-size: 1.1em; text-align: right; }
+
+/* ---------- people ---------- */
+.in-add-person { display: flex; gap: 6px; }
+.in-person-input { flex: 1 1 auto; min-width: 0; }
+.in-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.in-chip { display: inline-flex; align-items: center; gap: 4px; }
+.in-chip-x {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.1em;
+  line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.in-hint { font-size: 0.9em; }

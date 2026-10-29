@@ -1,0 +1,5 @@
+.gemini_key
+index.local.html
+qa/node_modules/
+*.zip
+qa/index-with-key.html

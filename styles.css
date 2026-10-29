@@ -1,0 +1,245 @@
+/*
+  SplitIt styles (Agent 3). Mobile-first, plain CSS, no frameworks.
+
+  SHARED CSS CLASSES (anyone may use these; only Agent 2 adds more, prefixed ".in-")
+    .screen      Wrapper for one whole screen: centred column with page padding.
+    .title       Screen heading (big, bold text).
+    .stack       Vertical list of children with even gaps between them.
+    .row         Horizontal line of children with gaps; wraps on small screens.
+    .card        Boxed panel (border, rounded corners, padding) for one thing: an item, a person.
+    .btn         Base button: at least 44px tall, rounded, readable label.
+    .btn-primary Main action button (filled accent colour). Use together with .btn.
+    .btn-ghost   Secondary action button (transparent, outlined). Use together with .btn.
+    .chip        Small pill-shaped toggle button (a person, a tip %). At least 44px tall.
+    .chip.on     A chip that is currently selected (filled accent colour).
+    .input       Text/number input: full width, 16px font (stops iOS zoom), 44px tall.
+    .sticky-bar  Bar stuck to the bottom of the viewport holding Back/Next buttons.
+    .warn        Warning look: warning-coloured border/background. Works on cards and text.
+    .muted       Quieter, secondary text (smaller, grey).
+
+  Also styled here: #app > header (the shell's top bar with app name and step dots).
+  Extra classes used only inside ui.js (assign/results screens) start with ".ui-".
+*/
+
+/* ---------- Design tokens ---------- */
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --text: #1b1c1f;
+  --text-muted: #6b6f76;
+  --border: #dcdde1;
+  --accent: #2f6fde;
+  --accent-text: #ffffff;
+  --warn-bg: #fff4e0;
+  --warn-border: #e09b20;
+  --warn-text: #8a5300;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --radius: 12px;
+  --radius-pill: 999px;
+  --tap: 44px;            /* minimum tap target size */
+  /* Room kept free under each screen so the fixed bottom bar never hides
+     content. Big enough for the tallest bar we have (two stacked buttons on
+     upload, about 121px) plus slack; the phone's safe area is added on top. */
+  --bar-space: 160px;
+}
+
+/* Dark mode: same tokens, darker values */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121316;
+    --surface: #1c1d21;
+    --text: #ececef;
+    --text-muted: #9a9ea6;
+    --border: #33353b;
+    --accent: #5b8ff0;
+    --accent-text: #0d0e10;
+    --warn-bg: #3a2a0f;
+    --warn-border: #d4962b;
+    --warn-text: #f3c77a;
+  }
+}
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The hidden attribute must always win, even over display:flex classes. */
+[hidden] { display: none !important; }
+
+/* ---------- App header (drawn by shell.js as <header class="row">) ---------- */
+#app > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Shared classes ---------- */
+.screen {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--bar-space) + env(safe-area-inset-bottom, 0px)); /* don't hide content under the sticky bar */
+}
+
+.title {
+  margin: 0 0 var(--space-4);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.btn {
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+}
+
+.chip {
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.input {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;   /* 16px or more stops iOS from zooming in */
+}
+
+.sticky-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.sticky-bar .btn { flex: 1; }
+
+.warn {
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+  color: var(--warn-text);
+}
+.card.warn { border-width: 2px; }
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Agent 3 private helpers (assign/results only) ---------- */
+.ui-spread {             /* name on the left, amount on the right */
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.ui-item-name { font-weight: 600; overflow-wrap: anywhere; }
+.ui-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui-big { font-size: 1.6rem; font-weight: 700; }
+
+.ui-person-head {        /* whole top of a person card is one big tap target */
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ui-breakdown {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.ui-warning { padding: var(--space-3); border: 1px solid var(--warn-border); border-radius: var(--radius); }
+.ui-label { font-weight: 600; }
