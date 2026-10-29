@@ -1,5 +1,9 @@
-// Live test: index.local.html (real key inside) reads real receipt photos through Gemini.
-// Run with the folder served over http:  BASE=http://localhost:8765 node live-gemini.js
+// Live test: the normal keyless index.html reads real receipt photos through
+// our server (/api/parse-receipt), which calls Gemini with the secret key.
+// Start the dev server with the reader on, then run this:
+//   FUNCTION=on node qa/dev-server.mjs
+//   BASE=http://localhost:8765 ONLY=receipt1 node qa/live-gemini.js
+// Quota is low: use ONLY=... to read one receipt at a time.
 // Never logs request headers or bodies, so the key stays out of the output.
 const { chromium } = require('playwright-core');
 const fs = require('fs');
@@ -19,7 +23,6 @@ function receiptList() {
       const exp = path.join(dir, f.replace(/\.jpg$/, '.expected.json'));
       if (!fs.existsSync(exp)) continue;
       const expected = JSON.parse(fs.readFileSync(exp, 'utf8'));
-      // Leader decision: a discount line is subtracted from the item line directly above it.
       list.push({ file: path.join(dir, f), expected });
     }
   }
@@ -28,10 +31,12 @@ function receiptList() {
 }
 
 async function readOne(page, file, net) {
-  await page.goto(BASE + '/index.local.html');
+  await page.goto(BASE + '/index.html');
   await page.evaluate(() => localStorage.clear()); await page.reload();
   await page.locator('.in-file').setInputFiles(file);
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // Quota is low, so try at most twice (TRIES=3 for more).
+  const tries = Number(process.env.TRIES || 2);
+  for (let attempt = 1; attempt <= tries; attempt++) {
     const t0 = Date.now();
     await page.getByRole('button', { name: 'Read receipt' }).click();
     await Promise.race([
@@ -41,8 +46,9 @@ async function readOne(page, file, net) {
     const ms = Date.now() - t0;
     if (await page.locator('.in-items').count()) return { ok: true, ms, attempt };
     const err = await page.locator('.in-error').textContent();
-    if (!/busy|too many/i.test(err) || attempt === 3) return { ok: false, ms, attempt, err };
-    await page.waitForTimeout(5000); // Gemini said "busy": wait and try again
+    if (!/busy|too many/i.test(err) || attempt === tries) return { ok: false, ms, attempt, err };
+    // Gemini said "busy" (wait 5 s) or "too many requests" (wait 60 s), then try again.
+    await page.waitForTimeout(/too many/i.test(err) ? 60000 : 5000);
   }
 }
 
@@ -53,12 +59,14 @@ async function readOne(page, file, net) {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   const net = [];
-  page.on('response', async r => {
-    if (!r.url().includes('generativelanguage')) return;
-    const h = await r.allHeaders();
-    net.push({ method: r.request().method(), status: r.status(), acao: h['access-control-allow-origin'] || null });
+  // Record the receipt-reader calls (method and status only), and flag any
+  // call straight to Gemini: the browser must never make one.
+  page.on('response', r => {
+    const u = r.url();
+    if (u.includes('/api/parse-receipt')) net.push({ method: r.request().method(), status: r.status() });
+    if (u.includes('generativelanguage')) net.push({ directGeminiCall: true });
   });
-  page.on('requestfailed', r => { if (r.url().includes('generativelanguage')) net.push({ failed: r.failure() && r.failure().errorText }); });
+  page.on('requestfailed', r => { if (r.url().includes('/api/parse-receipt')) net.push({ failed: r.failure() && r.failure().errorText }); });
 
   const summary = [];
   for (const { file, expected } of receiptList()) {
@@ -87,14 +95,7 @@ async function readOne(page, file, net) {
     summary.push([name, pricesMatch && qtyMatch && namesMatch && shownMatch && sum === expected.receiptTotalCents && afterNext === "Who's splitting?" ? 'PASS' : 'MISMATCH']);
   }
 
-  // Keyless build still says "isn't set up yet" and makes no Gemini call.
-  const before = net.length;
-  await page.goto(BASE + '/index.html'); await page.evaluate(() => localStorage.clear()); await page.reload();
-  await page.locator('.in-file').setInputFiles(path.resolve(__dirname, 'receipt-fi.jpg'));
-  await page.getByRole('button', { name: 'Read receipt' }).click();
-  await page.waitForFunction(() => document.querySelector('.in-error').textContent, null, { timeout: 5000 }).catch(() => {});
-  console.log('\nkeyless index.html error:', JSON.stringify(await page.locator('.in-error').textContent()), '| new Gemini calls:', net.length - before);
-  console.log('gemini network (CORS):', JSON.stringify(net));
+  console.log('reader network:', JSON.stringify(net));
   console.log('console errors:', JSON.stringify(errors));
   console.log('SUMMARY', JSON.stringify(summary));
   await b.close();

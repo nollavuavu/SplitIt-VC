@@ -93,3 +93,4 @@ LEADER DECISIONS (round 1 review)
 - The header (#app > header) is styled by Agent 3 in styles.css.
 - Receipt discounts: RECEIPT_PROMPT tells the model to subtract a discount line from the item directly above it. Prices are never negative. Payment, change and VAT-summary lines are ignored.
 - parseReceipt may also return skippedCount (number of receipt lines it could not read). The items screen tells the user when it is above 0.
+- PWA (leader decision): manifest.webmanifest, sw.js and icons/ sit next to index.html and are owned by Agent 3. The service worker never touches /api/*.

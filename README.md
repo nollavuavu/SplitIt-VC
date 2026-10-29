@@ -63,21 +63,29 @@ Edit the source files, not `index.html`, then rebuild:
   of the file. `qa/safety.js` checks that a crashing screen shows a
   "Start over" button.
 
-## Receipt reading (Gemini 2.5 Flash)
+## Receipt reading (Google Gemini)
 
-Receipt photos are read by Google Gemini 2.5 Flash. Without a key,
-"Read receipt" shows a friendly message and you type the items by hand.
+Receipt photos are read by Google Gemini, but the page itself never holds a
+key. It sends the photo to `/api/parse-receipt`, a small server function
+(`netlify/functions/parse-receipt.mjs`) that adds the secret key and the
+instructions for Gemini. Opened as a plain file (`file://`), or on a host
+with no function, "Read receipt" says "Receipt reading isn't set up yet" and
+you type the items by hand.
 
-Easiest safe way to add your key:
+Where the key goes:
 
-1. Put the key alone in a file called `.gemini_key` in the repo root.
-2. Run `sh qa/build.sh`. It builds `index.html` (no key) and
-   `index.local.html` (with your key). Open `index.local.html`.
+- **On Netlify:** set `GEMINI_API_KEY` under Site configuration >
+  Environment variables. Optionally set `GEMINI_MODEL` too (the default is
+  `gemini-3.5-flash`).
+- **Local dev:** put the key alone in a file called `.gemini_key` in the repo
+  root, next to `index.html` (the dev server `qa/dev-server.mjs` reads it from
+  there and never prints it). Then run
 
-Both `.gemini_key` and `index.local.html` are in `.gitignore`.
+      FUNCTION=on node qa/dev-server.mjs
 
-You can also paste the key into `const API_KEY = '';` in `input.js`, but then
-rebuilding puts the key into `index.html`, which IS committed. Undo that
-before you commit.
+  and open http://localhost:8765. You can also set `GEMINI_MODEL` before the
+  command. Without `FUNCTION=on` the dev server acts like a plain static
+  host with no receipt reader (that is what `npm test` uses).
 
-**Never commit a key.** Anyone with the HTML file can read it.
+`.gemini_key` is in `.gitignore`. **Never commit a key**, and never put it in
+`index.html` or any other file the browser downloads.

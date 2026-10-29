@@ -1,0 +1,31 @@
+# Netlify settings for SplitIt.
+# The site is plain static files; the only server code is the receipt
+# reader in netlify/functions/parse-receipt.mjs.
+# Set GEMINI_API_KEY (and optionally GEMINI_MODEL) in the Netlify UI under
+# Site configuration > Environment variables. Never put the key in this file.
+# The deploy folder holds the app files (index.html, manifest, sw.js, icons/) plus netlify.toml and netlify/.
+
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# The app calls /api/parse-receipt; send it to the function.
+[[redirects]]
+  from = "/api/parse-receipt"
+  to = "/.netlify/functions/parse-receipt"
+  status = 200
+  force = true
+
+# Safety net: never serve the key file or the function's source code,
+# even if they end up in the deploy folder by mistake.
+[[redirects]]
+  from = "/.gemini_key"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/netlify/*"
+  to = "/404.html"
+  status = 404
+  force = true

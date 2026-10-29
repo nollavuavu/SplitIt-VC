@@ -1,6 +1,5 @@
+*.zip
 .gemini_key
-index.local.html
+.netlify/
 qa/node_modules/
 qa/out/
-*.zip
-qa/index-with-key.html

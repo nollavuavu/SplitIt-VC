@@ -453,4 +453,29 @@ globalThis.SplitIt = globalThis.SplitIt || {};
   /* ------------------------------------------------------------------ */
   SplitIt.registerScreen("assign", renderAssign);
   SplitIt.registerScreen("results", renderResults);
+
+  /* ------------------------------------------------------------------ */
+  /* Offline support: register the service worker (sw.js)                */
+  /* ------------------------------------------------------------------ */
+
+  // Browsers only allow service workers on https:// pages, plus localhost
+  // for testing. Opening index.html as a file:// skips this, which is fine:
+  // the app still works, it just isn't installable or offline-ready.
+  function canUseServiceWorker() {
+    if (!("serviceWorker" in navigator)) return false;
+    if (location.protocol === "https:") return true;
+    return location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  }
+
+  function registerServiceWorker() {
+    if (!canUseServiceWorker()) return;
+    // Wait until the page has loaded so the first visit stays fast.
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function (err) {
+        console.warn("SplitIt: offline mode unavailable:", err && err.message ? err.message : err);
+      });
+    });
+  }
+
+  registerServiceWorker();
 })();

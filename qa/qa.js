@@ -2,7 +2,6 @@
 const { chromium } = require('playwright-core');
 const path = require('path');
 const URL = process.env.BASE ? process.env.BASE + '/index.html' : 'file://' + path.resolve(__dirname, '../index.html');
-const KEY_URL = process.env.BASE ? process.env.BASE + '/qa/index-with-key.html' : 'file://' + path.resolve(__dirname, 'index-with-key.html');
 const OUT = path.resolve(__dirname, 'out');
 require('fs').mkdirSync(OUT, { recursive: true });
 const shot = name => path.join(OUT, name);
@@ -255,11 +254,23 @@ async function contrastAudit(page, label) {
   }
 
   // ---- C: parse fails ----
-  for (const [label, url, file, expect] of [
-    ['no key + real image', URL, 'receipt.png', /Receipt reading isn't set up yet/],
-    ['no key + non-image file', URL, 'notimage.txt', /not an image/],
-    ['key set, stub endpoint', KEY_URL, 'receipt.png', /answered with an error \([45]\d\d\)|Couldn't reach the receipt reader/]]) {
+  // Over file:// and on the dev server's default (FUNCTION off) there is no
+  // receipt reader, so a real image gives "isn't set up yet".
+  // Served over http, two more cases fake the server's answer in the
+  // browser (no real network): Gemini busy, and the server unreachable.
+  const cCases = [
+    ['no reader + real image', null, 'receipt.png', /Receipt reading isn't set up yet/],
+    ['no reader + non-image file', null, 'notimage.txt', /not an image/]];
+  if (process.env.BASE) {
+    cCases.push(['server says Gemini busy (faked)',
+      r => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'gemini_http', geminiStatus: 503 }) }),
+      'receipt.png', /receipt reader is busy/]);
+    cCases.push(['server unreachable (faked)', r => r.abort(), 'receipt.png', /Couldn't reach the receipt reader/]);
+  }
+  for (const [label, fake, file, expect] of cCases) {
+    const url = URL;
     const page = await newPage(browser, 'light');
+    if (fake) await page.route('**/api/parse-receipt', fake);
     await page.goto(url); await page.evaluate(() => localStorage.clear()); await page.reload();
     await page.locator('.in-file').setInputFiles(path.resolve(__dirname, file));
     await page.getByRole('button', { name: 'Read receipt' }).click();
@@ -269,7 +280,7 @@ async function contrastAudit(page, label) {
     const manual = await page.getByRole('button', { name: 'Enter manually' }).isEnabled();
     const stillUpload = await step(page);
     result(`C (${label}): error shown + manual entry offered`, expect.test(err) && errVisible && manual, JSON.stringify(err));
-    if (label === 'no key + real image') {
+    if (label === 'no reader + real image') {
       await layoutAudit(page, 'upload+preview+error');
       await page.screenshot({ path: shot('upload-error-light.png'), fullPage: true });
       await page.getByRole('button', { name: 'Enter manually' }).click();
