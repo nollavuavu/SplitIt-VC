@@ -26,3 +26,20 @@ PY
 else
   echo "built index.html (no .gemini_key, so no index.local.html)"
 fi
+
+# QA-only copy: a fake key plus a stub endpoint (a path that doesn't exist on
+# the local test server), so qa.js can test the "key set but call fails" path
+# without the real key and without touching the network.
+python3 - <<'PY'
+html = open('index.html').read()
+key_line = "const API_KEY = '';"
+url_start = "const GEMINI_URL ="
+if html.count(key_line) != 1 or html.count(url_start) != 1:
+    raise SystemExit('build.sh: API_KEY or GEMINI_URL line not found exactly once')
+html = html.replace(key_line, "const API_KEY = 'qa-fake-key';")
+start = html.index(url_start)
+end = html.index(';', start) + 1
+html = html[:start] + "const GEMINI_URL = 'stub-gemini/generateContent';" + html[end:]
+open('qa/index-with-key.html', 'w').write(html)
+PY
+echo "built qa/index-with-key.html"

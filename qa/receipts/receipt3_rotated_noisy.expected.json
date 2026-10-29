@@ -1,0 +1,33 @@
+{
+  "description": "Rotated about 4.5 degrees, speckle noise and slight blur, on a grey background. Qty is a prefix on the line. Cash payment and change lines must NOT become items.",
+  "items": [
+    {
+      "name": "Cappuccino",
+      "qty": 2,
+      "priceCents": 980
+    },
+    {
+      "name": "Korvapuusti",
+      "qty": 2,
+      "priceCents": 760
+    },
+    {
+      "name": "Kinkkukolmioleipä",
+      "qty": 1,
+      "priceCents": 890
+    },
+    {
+      "name": "Tuoremehu",
+      "qty": 1,
+      "priceCents": 450
+    },
+    {
+      "name": "Mustikkapiirakka",
+      "qty": 1,
+      "priceCents": 620
+    }
+  ],
+  "taxCents": 0,
+  "currency": "EUR",
+  "receiptTotalCents": 3700
+}

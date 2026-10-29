@@ -3,6 +3,9 @@ const { chromium } = require('playwright-core');
 const path = require('path');
 const URL = process.env.BASE ? process.env.BASE + '/index.html' : 'file://' + path.resolve(__dirname, '../index.html');
 const KEY_URL = process.env.BASE ? process.env.BASE + '/qa/index-with-key.html' : 'file://' + path.resolve(__dirname, 'index-with-key.html');
+const OUT = path.resolve(__dirname, 'out');
+require('fs').mkdirSync(OUT, { recursive: true });
+const shot = name => path.join(OUT, name);
 const out = [];
 const log = (...a) => { const s = a.join(' '); out.push(s); console.log(s); };
 const result = (name, ok, info) => log((ok ? 'PASS ' : 'FAIL ') + name + (info ? ' :: ' + info : ''));
@@ -88,13 +91,13 @@ async function contrastAudit(page, label) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
 
   // ---------- Globals check ----------
   {
     const page = await newPage(browser, 'light');
-    require('fs').writeFileSync(path.resolve(__dirname,'blank.html'),'<!doctype html><html><body></body></html>');
-    await page.goto(URL.replace(/index\.html$/, 'qa/blank.html').replace(/^file:.*/, 'file://' + path.resolve(__dirname,'blank.html')));
+    require('fs').writeFileSync(path.join(OUT, 'blank.html'),'<!doctype html><html><body></body></html>');
+    await page.goto(process.env.BASE ? process.env.BASE + '/qa/out/blank.html' : 'file://' + path.join(OUT, 'blank.html'));
     const base = await page.evaluate(() => Object.getOwnPropertyNames(window));
     await page.goto(URL);
     const after = await page.evaluate(() => Object.getOwnPropertyNames(window));
@@ -135,11 +138,11 @@ async function contrastAudit(page, label) {
     result('items: typing keeps focus (name+price)', focusOk);
     log('  items subtotal: ' + (await page.locator('.in-subtotal').textContent()).replace(/\u00a0/g, ' '));
     await layoutAudit(page, 'items'); await contrastAudit(page, 'items');
-    await page.screenshot({ path: `items-${scheme}.png`, fullPage: true });
+    await page.screenshot({ path: shot(`items-${scheme}.png`), fullPage: true });
     await page.getByRole('button', { name: 'Next' }).click();
     await addPeople(page, ['Aino', 'Bo', 'Cleo']);
     await layoutAudit(page, 'people');
-    await page.screenshot({ path: `people-${scheme}.png`, fullPage: true });
+    await page.screenshot({ path: shot(`people-${scheme}.png`), fullPage: true });
     // Back/Next data retention: people -> items -> people
     await page.getByRole('button', { name: 'Back' }).click();
     const itemsBack = await page.locator('.in-name').evaluateAll(es => es.map(e => e.value).join(','));
@@ -163,7 +166,7 @@ async function contrastAudit(page, label) {
     log('  Nachos note: ' + (await card(page, 'Nachos').locator('.muted').textContent()).replace(/\u00a0/g, ' '));
     log('  assign Next label after: ' + await page.locator('.sticky-bar .btn-primary').textContent());
     await layoutAudit(page, 'assign'); await contrastAudit(page, 'assign');
-    await page.screenshot({ path: `assign-${scheme}.png`, fullPage: true });
+    await page.screenshot({ path: shot(`assign-${scheme}.png`), fullPage: true });
     await page.locator('.sticky-bar .btn-primary').click();
     await page.getByRole('button', { name: '10 %' }).click();
     const t = await totals(page);
@@ -192,7 +195,7 @@ async function contrastAudit(page, label) {
     result('results: payment link silent (focus kept) and survives Back->Next', plFocus && backStep === 'assign' && plAfter === 'https://pay.example/x', `focus=${plFocus} back=${backStep} value=${plAfter}`);
     await layoutAudit(page, 'results'); await contrastAudit(page, 'results');
     await page.locator('.ui-person-head').first().click();
-    await page.screenshot({ path: `results-${scheme}.png`, fullPage: true });
+    await page.screenshot({ path: shot(`results-${scheme}.png`), fullPage: true });
     // Copy: clipboard rejecting -> textarea fallback; clipboard missing.
     await page.evaluate(() => { navigator.clipboard.writeText = () => Promise.reject(new Error('denied')); });
     await page.getByRole('button', { name: 'Copy summary' }).click();
@@ -223,7 +226,7 @@ async function contrastAudit(page, label) {
     await page.locator('.sticky-bar .btn-primary').click();
     const warns = await page.locator('.ui-warning').allTextContents();
     result('F: Pasta unassigned (.warn) and results warning shown', pastaWarn && warns.some(w => /1 item unassigned/.test(w)), JSON.stringify(warns) + ' totals=' + JSON.stringify(await totals(page)));
-    await page.screenshot({ path: `results-unassigned-${scheme}.png`, fullPage: true });
+    await page.screenshot({ path: shot(`results-unassigned-${scheme}.png`), fullPage: true });
 
     // ---- Start over ----
     await page.getByRole('button', { name: 'Start over' }).click();
@@ -255,7 +258,7 @@ async function contrastAudit(page, label) {
   for (const [label, url, file, expect] of [
     ['no key + real image', URL, 'receipt.png', /Receipt reading isn't set up yet/],
     ['no key + non-image file', URL, 'notimage.txt', /not an image/],
-    ['key set, stub endpoint', KEY_URL, 'receipt.png', /not connected yet/]]) {
+    ['key set, stub endpoint', KEY_URL, 'receipt.png', /answered with an error \([45]\d\d\)|Couldn't reach the receipt reader/]]) {
     const page = await newPage(browser, 'light');
     await page.goto(url); await page.evaluate(() => localStorage.clear()); await page.reload();
     await page.locator('.in-file').setInputFiles(path.resolve(__dirname, file));
@@ -268,7 +271,7 @@ async function contrastAudit(page, label) {
     result(`C (${label}): error shown + manual entry offered`, expect.test(err) && errVisible && manual, JSON.stringify(err));
     if (label === 'no key + real image') {
       await layoutAudit(page, 'upload+preview+error');
-      await page.screenshot({ path: 'upload-error-light.png', fullPage: true });
+      await page.screenshot({ path: shot('upload-error-light.png'), fullPage: true });
       await page.getByRole('button', { name: 'Enter manually' }).click();
       result('C: Enter manually after error reaches items', (await page.locator('h1.title').textContent()) === 'Check the items');
     }
@@ -333,5 +336,5 @@ async function contrastAudit(page, label) {
     await page.context().close();
   }
   await browser.close();
-  require('fs').writeFileSync(path.resolve(__dirname, 'qa-report.txt'), out.join('\n') + '\n');
+  require('fs').writeFileSync(path.join(OUT, 'qa-report.txt'), out.join('\n') + '\n');
 })().catch(e => { console.error(e); process.exit(1); });

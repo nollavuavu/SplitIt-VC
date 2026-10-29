@@ -1,5 +1,6 @@
 .gemini_key
 index.local.html
 qa/node_modules/
+qa/out/
 *.zip
 qa/index-with-key.html

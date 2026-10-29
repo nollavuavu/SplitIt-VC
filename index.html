@@ -1090,9 +1090,14 @@ globalThis.SplitIt = globalThis.SplitIt || {};
   // types the items by hand (no network is used).
   const API_KEY = '';
 
-  // The Gemini model and web address we send the photo to.
+  // The Gemini model and the web address we send the photo to.
+  // (gemini-2.5-flash answers 404 "no longer available to new users" for new keys.)
+  const GEMINI_MODEL = 'gemini-3.5-flash';
+
+  // Give up waiting for Gemini after this many milliseconds.
+  const GEMINI_TIMEOUT_MS = 60000;
   const GEMINI_URL =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+    'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
 
   // The instruction we send to the vision model together with the photo.
   // It must answer with ONLY a JSON object in exactly this shape.
@@ -1102,7 +1107,10 @@ globalThis.SplitIt = globalThis.SplitIt || {};
     '{"items":[{"name":string,"qty":number,"price":number}],"tax":number|null,"currency":string}. ' +
     'Rules: one entry per purchased line. "price" is the LINE TOTAL exactly as printed on that line ' +
     '(not the unit price), as a plain number like 12.50. "qty" is the quantity on that line, 1 if none is shown. ' +
-    'Do NOT include subtotal, total, VAT summary, tip, change, card or cash payment lines as items. ' +
+    'Do NOT include subtotal, total (e.g. YHTEENSÄ), VAT/ALV summary, tip, card or cash payment (e.g. KORTTI, KÄTEINEN) ' +
+    'or change (e.g. TAKAISIN) lines as items. ' +
+    'A discount line (e.g. "Alennus ... -2,00") is never its own item: subtract it from the price of the item line ' +
+    'directly above it. Never return a negative price. ' +
     '"tax" is a separately added tax amount only if the receipt adds tax on top of the items; ' +
     'if prices already include VAT (as in Finland) use null. ' +
     '"currency" is the ISO 4217 code such as "EUR". If unsure of the currency, use "EUR".';
@@ -1180,16 +1188,23 @@ globalThis.SplitIt = globalThis.SplitIt || {};
       generationConfig: { responseMimeType: 'application/json', temperature: 0 }
     };
 
+    // An AbortController lets us cancel the request if Gemini takes too long.
+    const controller = new AbortController();
+    const timer = setTimeout(function () { controller.abort(); }, GEMINI_TIMEOUT_MS);
+
     let res;
     try {
       res = await fetch(GEMINI_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
     } catch (e) {
-      // fetch only fails like this when there is no connection at all.
+      // fetch fails like this when there is no connection, or we gave up waiting.
       throw new Error("Couldn't reach the receipt reader. Check your connection or enter items manually.");
+    } finally {
+      clearTimeout(timer);
     }
 
     if (!res.ok) {
@@ -1210,7 +1225,7 @@ globalThis.SplitIt = globalThis.SplitIt || {};
     if (status === 400 || status === 401 || status === 403) {
       return 'The receipt reader refused the request (' + status + '). Check the API key, or enter items manually.';
     }
-    if (status === 429) {
+    if (status === 429 || status === 503) {
       return 'The receipt reader is busy right now (too many requests). Wait a minute or enter items manually.';
     }
     return 'The receipt reader answered with an error (' + status + '). Try again or enter items manually.';

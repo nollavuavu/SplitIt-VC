@@ -1,0 +1,38 @@
+{
+  "description": "Qty lines (unit price on a second line, line total on the right), a discount line, and an ALV (VAT) summary block. Prices include VAT, so tax must be 0/null. The ALV block, YHTEENSÄ and KORTTI lines must NOT become items.",
+  "items": [
+    {
+      "name": "Hampurilainen",
+      "qty": 2,
+      "priceCents": 1980
+    },
+    {
+      "name": "Coca-Cola 0,33l",
+      "qty": 3,
+      "priceCents": 1050
+    },
+    {
+      "name": "Pizza Pepperoni",
+      "qty": 1,
+      "priceCents": 1590
+    },
+    {
+      "name": "Ranskalaiset",
+      "qty": 1,
+      "priceCents": 490
+    },
+    {
+      "name": "Lapin Kulta 0,5l",
+      "qty": 2,
+      "priceCents": 1640
+    }
+  ],
+  "taxCents": 0,
+  "currency": "EUR",
+  "discountLine": {
+    "name": "Alennus lounasetu",
+    "priceCents": -200
+  },
+  "receiptTotalCents": 6550,
+  "note": "Item lines sum to 6750; receipt total is 6550 after the discount. The contract has no discount field and parseReceipt skips negative prices, so the expected app result is the 5 items (sum 6750) and the 2,00 discount is lost unless handled."
+}

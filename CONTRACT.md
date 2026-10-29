@@ -91,3 +91,4 @@ LEADER DECISIONS (round 1 review)
 - Assignment changes go only through engine.toggleAssignment. updateItem does not accept assignedTo.
 - parseReceipt with no API key REJECTS with a readable Error (no mock receipt in the shipped build), so manual entry is offered.
 - The header (#app > header) is styled by Agent 3 in styles.css.
+- Receipt discounts: RECEIPT_PROMPT tells the model to subtract a discount line from the item directly above it. Prices are never negative. Payment, change and VAT-summary lines are ignored.

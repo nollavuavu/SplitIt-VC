@@ -1,0 +1,33 @@
+{
+  "description": "Clean receipt, 5 single-qty lines, VAT included, no tax line.",
+  "items": [
+    {
+      "name": "Margherita",
+      "qty": 1,
+      "priceCents": 1450
+    },
+    {
+      "name": "Lohikeitto",
+      "qty": 1,
+      "priceCents": 1690
+    },
+    {
+      "name": "Caesar-salaatti",
+      "qty": 1,
+      "priceCents": 1290
+    },
+    {
+      "name": "Karhu III 0,5l",
+      "qty": 1,
+      "priceCents": 780
+    },
+    {
+      "name": "Tiramisu",
+      "qty": 1,
+      "priceCents": 850
+    }
+  ],
+  "taxCents": 0,
+  "currency": "EUR",
+  "receiptTotalCents": 6060
+}
