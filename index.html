@@ -1104,14 +1104,14 @@ globalThis.SplitIt = globalThis.SplitIt || {};
   const RECEIPT_PROMPT =
     'You are reading a photo of a restaurant receipt. ' +
     'Reply with ONLY a JSON object, no explanation and no markdown, in exactly this shape: ' +
-    '{"items":[{"name":string,"qty":number,"price":number}],"tax":number|null,"currency":string}. ' +
+    '{"items":[{"name":string,"qty":number,"price":string}],"tax":string|null,"currency":string}. ' +
     'Rules: one entry per purchased line. "price" is the LINE TOTAL exactly as printed on that line ' +
-    '(not the unit price), as a plain number like 12.50. "qty" is the quantity on that line, 1 if none is shown. ' +
+    '(not the unit price), written as a STRING with a dot and exactly 2 decimals, like "12.50" or "4.00". "qty" is the quantity on that line, 1 if none is shown. ' +
     'Do NOT include subtotal, total (e.g. YHTEENSÄ), VAT/ALV summary, tip, card or cash payment (e.g. KORTTI, KÄTEINEN) ' +
     'or change (e.g. TAKAISIN) lines as items. ' +
     'A discount line (e.g. "Alennus ... -2,00") is never its own item: subtract it from the price of the item line ' +
     'directly above it. Never return a negative price. ' +
-    '"tax" is a separately added tax amount only if the receipt adds tax on top of the items; ' +
+    '"tax" is a separately added tax amount (a string like "3.20") only if the receipt adds tax on top of the items; ' +
     'if prices already include VAT (as in Finland) use null. ' +
     '"currency" is the ISO 4217 code such as "EUR". If unsure of the currency, use "EUR".';
 
@@ -1189,35 +1189,47 @@ globalThis.SplitIt = globalThis.SplitIt || {};
     };
 
     // An AbortController lets us cancel the request if Gemini takes too long.
+    // The timer covers BOTH waiting for the answer and reading its body.
     const controller = new AbortController();
     const timer = setTimeout(function () { controller.abort(); }, GEMINI_TIMEOUT_MS);
 
     let res;
-    try {
-      res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-    } catch (e) {
-      // fetch fails like this when there is no connection, or we gave up waiting.
-      throw new Error("Couldn't reach the receipt reader. Check your connection or enter items manually.");
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (!res.ok) {
-      throw new Error(friendlyHttpError(res.status));
-    }
-
     let data;
     try {
-      data = await res.json();
-    } catch (e) {
-      throw new Error("The receipt reader sent a broken answer. Try again or enter items manually.");
+      try {
+        res = await fetch(GEMINI_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
+      } catch (e) {
+        throw new Error(isTimeout(e) ? TOO_SLOW_MESSAGE :
+          "Couldn't reach the receipt reader. Check your connection or enter items manually.");
+      }
+
+      if (!res.ok) {
+        throw new Error(friendlyHttpError(res.status));
+      }
+
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(isTimeout(e) ? TOO_SLOW_MESSAGE :
+          'The receipt reader sent a broken answer. Try again or enter items manually.');
+      }
+    } finally {
+      clearTimeout(timer); // always stop the timer, whatever happened
     }
     return getReplyText(data);
+  }
+
+  const TOO_SLOW_MESSAGE =
+    'The receipt reader took too long to answer. Try again or enter items manually.';
+
+  // True if this error came from our timer cancelling the request.
+  function isTimeout(e) {
+    return !!e && e.name === 'AbortError';
   }
 
   // Turn an HTTP status code from Gemini into a message a person understands.
@@ -1225,19 +1237,45 @@ globalThis.SplitIt = globalThis.SplitIt || {};
     if (status === 400 || status === 401 || status === 403) {
       return 'The receipt reader refused the request (' + status + '). Check the API key, or enter items manually.';
     }
-    if (status === 429 || status === 503) {
-      return 'The receipt reader is busy right now (too many requests). Wait a minute or enter items manually.';
+    if (status === 404) {
+      return 'The receipt reader model was not found (404). Check GEMINI_MODEL in input.js, or enter items manually.';
+    }
+    if (status === 429) {
+      return 'Too many requests to the receipt reader right now. Wait a minute or enter items manually.';
+    }
+    if (status === 503) {
+      return 'The receipt reader is busy right now. Try again in a minute or enter items manually.';
     }
     return 'The receipt reader answered with an error (' + status + '). Try again or enter items manually.';
   }
 
-  // Dig the answer text out of Gemini's reply, or throw if it isn't there
-  // (for example when Gemini blocked the image).
+  // Dig the answer text out of Gemini's reply, or throw a clear message
+  // when there is none (blocked photo, cut-off answer, empty reply).
   function getReplyText(data) {
+    // Gemini refused the whole request (for example the image was blocked).
+    if (data && data.promptFeedback && data.promptFeedback.blockReason) {
+      throw new Error('The receipt reader refused this photo (' + data.promptFeedback.blockReason +
+        '). Try another photo or enter items manually.');
+    }
+
     const candidate = data && data.candidates && data.candidates[0];
-    const parts = candidate && candidate.content && candidate.content.parts;
-    const text = parts && parts[0] && parts[0].text;
-    if (typeof text !== 'string' || text.trim() === '') {
+    const reason = candidate && candidate.finishReason;
+    if (reason === 'SAFETY') {
+      throw new Error('The receipt reader stopped for safety reasons. Try another photo or enter items manually.');
+    }
+    if (reason === 'MAX_TOKENS') {
+      throw new Error('The receipt is too long for the reader to finish. Enter the items manually, or photograph it in two parts.');
+    }
+
+    // The answer can be split over several parts: glue all the text together.
+    const parts = (candidate && candidate.content && candidate.content.parts) || [];
+    let text = '';
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i] && typeof parts[i].text === 'string') {
+        text += parts[i].text;
+      }
+    }
+    if (text.trim() === '') {
       throw new Error("The receipt reader didn't send back any items. Try a clearer photo or enter items manually.");
     }
     return text;
@@ -1273,6 +1311,7 @@ globalThis.SplitIt = globalThis.SplitIt || {};
     }
 
     const items = [];
+    let skippedCount = 0; // lines we couldn't read and left out
     for (let i = 0; i < data.items.length; i++) {
       const raw = data.items[i] || {};
       // Let the engine turn the price into cents (no float money math).
@@ -1282,6 +1321,7 @@ globalThis.SplitIt = globalThis.SplitIt || {};
       // by hand on the items screen.
       const priceCents = SplitIt.engine.parseMoneyInput(String(raw.price));
       if (priceCents === null) {
+        skippedCount++;
         continue;
       }
       let qty = typeof raw.qty === 'string' ? Number(raw.qty) : raw.qty;
@@ -1311,11 +1351,12 @@ globalThis.SplitIt = globalThis.SplitIt || {};
       currency = data.currency.trim().toUpperCase();
     }
 
-    return { items: items, taxCents: taxCents, currency: currency };
+    return { items: items, taxCents: taxCents, currency: currency, skippedCount: skippedCount };
   }
 
   // PUBLIC: SplitIt.parseReceipt(imageFile)
-  // -> Promise<{ items: [{name, qty, priceCents}], taxCents, currency }>
+  // -> Promise<{ items: [{name, qty, priceCents}], taxCents, currency, skippedCount }>
+  // skippedCount = how many receipt lines had an unreadable price and were left out.
   SplitIt.parseReceipt = async function parseReceipt(imageFile) {
     if (!imageFile) {
       throw new Error('Please choose a photo of the receipt first.');
@@ -1487,6 +1528,7 @@ globalThis.SplitIt = globalThis.SplitIt || {};
         }
         state = Object.assign({}, state, { taxCents: result.taxCents, currency: result.currency });
         resetItemDrafts();
+        skippedLines = result.skippedCount || 0;
         ctx.setState(state, { silent: true });
         ctx.goTo('items');
       } catch (e) {
@@ -1508,9 +1550,13 @@ globalThis.SplitIt = globalThis.SplitIt || {};
   let priceDrafts = {};
   let taxDraft = null; // null = no draft, use state.taxCents
 
+  // How many lines the last receipt read had to leave out (0 = none).
+  let skippedLines = 0;
+
   function resetItemDrafts() {
     priceDrafts = {};
     taxDraft = null;
+    skippedLines = 0;
   }
 
   function renderItems(root, ctx) {
@@ -1522,6 +1568,16 @@ globalThis.SplitIt = globalThis.SplitIt || {};
     const screen = el('div', 'stack in-items');
     screen.appendChild(el('h1', 'title', 'Check the items'));
     screen.appendChild(el('p', 'muted', 'Fix anything the receipt reader got wrong. Price is the total for the line.'));
+
+    // Tell the user if the receipt reader had to leave some lines out.
+    if (skippedLines > 0) {
+      const notice = skippedLines === 1
+        ? "1 line couldn't be read. Please add it."
+        : skippedLines + " lines couldn't be read. Please add them.";
+      const skippedMsg = el('p', 'warn in-skipped', notice);
+      skippedMsg.setAttribute('role', 'status');
+      screen.appendChild(skippedMsg);
+    }
 
     const list = el('div', 'stack in-list');
     screen.appendChild(list);

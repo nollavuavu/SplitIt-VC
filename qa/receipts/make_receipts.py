@@ -66,7 +66,8 @@ for n, q, unit in items2:
         lines += [("n", n), ("n", lr(f"  {q} x {eur(unit)}", eur(q * unit)))]
     else:
         lines += [("n", lr(n, eur(unit)))]
-lines += [("n", lr("Alennus lounasetu", eur(discount)))]
+    if n == "Pizza Pepperoni":  # the discount line sits right under the pizza
+        lines += [("n", lr("Alennus lounasetu", eur(discount)))]
 food = 2 * 990 + 3 * 350 + 1590 + 490 + discount   # 14 % VAT group (discount on food)
 alc = 2 * 820                                       # 25,5 % VAT group
 total2 = food + alc
@@ -80,11 +81,11 @@ lines += [("n", "-" * COLS), ("bold", lr("YHTEENSÄ EUR", eur(total2))), ("n", "
           ("n", ""), ("center", "KIITOS JA TERVETULOA UUDELLEEN")]
 save("receipt2_qty_vat_discount", render(lines), {
     "description": "Qty lines (unit price on a second line, line total on the right), a discount line, and an ALV (VAT) summary block. Prices include VAT, so tax must be 0/null. The ALV block, YHTEENSÄ and KORTTI lines must NOT become items.",
-    "items": [{"name": n, "qty": q, "priceCents": q * u} for n, q, u in items2],
+    "items": [{"name": n, "qty": q, "priceCents": q * u + (discount if n == "Pizza Pepperoni" else 0)} for n, q, u in items2],
     "taxCents": 0, "currency": "EUR",
-    "discountLine": {"name": "Alennus lounasetu", "priceCents": discount},
+    "discountLine": {"name": "Alennus lounasetu", "priceCents": discount, "foldedInto": "Pizza Pepperoni"},
     "receiptTotalCents": total2,
-    "note": "Item lines sum to %d; receipt total is %d after the discount. The contract has no discount field and parseReceipt skips negative prices, so the expected app result is the 5 items (sum %d) and the 2,00 discount is lost unless handled." % (total2 - discount, total2, total2 - discount)})
+    "note": "Leader ruling (b): the discount is folded into the item line directly above it (Pizza Pepperoni 15,90 - 2,00 = 13,90), so the items sum to the receipt total %d." % total2})
 
 # ---------- 3. rotated + noisy ----------
 items3 = [("Cappuccino", 2, 490), ("Korvapuusti", 2, 380), ("Kinkkukolmioleipä", 1, 890),

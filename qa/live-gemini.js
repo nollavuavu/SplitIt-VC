@@ -20,7 +20,6 @@ function receiptList() {
       if (!fs.existsSync(exp)) continue;
       const expected = JSON.parse(fs.readFileSync(exp, 'utf8'));
       // Leader decision: a discount line is subtracted from the item line directly above it.
-      if (expected.discountLine) expected.items[expected.items.length - 1].priceCents += expected.discountLine.priceCents;
       list.push({ file: path.join(dir, f), expected });
     }
   }
@@ -42,7 +41,7 @@ async function readOne(page, file, net) {
     const ms = Date.now() - t0;
     if (await page.locator('.in-items').count()) return { ok: true, ms, attempt };
     const err = await page.locator('.in-error').textContent();
-    if (!/busy/.test(err) || attempt === 3) return { ok: false, ms, attempt, err };
+    if (!/busy|too many/i.test(err) || attempt === 3) return { ok: false, ms, attempt, err };
     await page.waitForTimeout(5000); // Gemini said "busy": wait and try again
   }
 }

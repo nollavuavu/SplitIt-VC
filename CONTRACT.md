@@ -92,3 +92,4 @@ LEADER DECISIONS (round 1 review)
 - parseReceipt with no API key REJECTS with a readable Error (no mock receipt in the shipped build), so manual entry is offered.
 - The header (#app > header) is styled by Agent 3 in styles.css.
 - Receipt discounts: RECEIPT_PROMPT tells the model to subtract a discount line from the item directly above it. Prices are never negative. Payment, change and VAT-summary lines are ignored.
+- parseReceipt may also return skippedCount (number of receipt lines it could not read). The items screen tells the user when it is above 0.

@@ -14,7 +14,7 @@
     {
       "name": "Pizza Pepperoni",
       "qty": 1,
-      "priceCents": 1590
+      "priceCents": 1390
     },
     {
       "name": "Ranskalaiset",
@@ -31,8 +31,9 @@
   "currency": "EUR",
   "discountLine": {
     "name": "Alennus lounasetu",
-    "priceCents": -200
+    "priceCents": -200,
+    "foldedInto": "Pizza Pepperoni"
   },
   "receiptTotalCents": 6550,
-  "note": "Item lines sum to 6750; receipt total is 6550 after the discount. The contract has no discount field and parseReceipt skips negative prices, so the expected app result is the 5 items (sum 6750) and the 2,00 discount is lost unless handled."
+  "note": "Leader ruling (b): the discount is folded into the item line directly above it (Pizza Pepperoni 15,90 - 2,00 = 13,90), so the items sum to the receipt total 6550."
 }
